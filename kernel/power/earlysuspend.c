@@ -76,6 +76,14 @@ void register_early_suspend(struct early_suspend *handler)
 {
 	struct list_head *pos;
 
+#ifdef CONFIG_SPEEDUP_EARLYSUSPEND
+ //Lycan.Wang@Prd.BasicDrv, 2013-09-02 Add for speedup wakeup
+ //TODO some struct in .ko has no init
+ 	if (handler->need_speedup && handler->need_speedup !=1) {
+ 	handler->need_speedup = 0;
+	}
+#endif /* CONFIG_SPEEDUP_EARLYSUSPEND */
+
 	mutex_lock(&early_suspend_lock);
 	list_for_each(pos, &early_suspend_handlers) {
 		struct early_suspend *e;
@@ -142,8 +150,14 @@ static void early_suspend(struct work_struct *work)
 				starttime = ktime_get();
 				
 			}
-			//backup suspend addr.
-			earlysuspend_func = pos->suspend;
+#ifdef CONFIG_SPEEDUP_EARLYSUSPEND
+//Lycan.Wang@Prd.BasicDrv, 2013-08-31 Add for speedup wakeup
+			if (pos->need_speedup) {
+            			suspend_speedup(pos);
+			}
+#endif /* CONFIG_SPEEDUP_EARLYSUSPEND */
+                        //backup suspend addr.
+                        earlysuspend_func = pos->suspend;
 			pos->suspend(pos);
 
 			if (debug_mask & DEBUG_VERBOSE){
@@ -225,6 +239,8 @@ static void late_resume(struct work_struct *work)
 			}
 			//backup resume addr.
 			earlysuspend_func = pos->resume;
+#ifndef CONFIG_SPEEDUP_EARLYSUSPEND
+//Lycan.Wang@Prd.BasicDrv, 2013-08-31 Modify for speedup wakeup
 			pos->resume(pos);
 
 			if (debug_mask & DEBUG_VERBOSE){
@@ -241,7 +257,18 @@ static void late_resume(struct work_struct *work)
 				    msleep(debug_mask_delay_ms);
 				}
 			}
-	
+
+#else /* !CONFIG_SPEEDUP_EARLYSUSPEND */
+			long long time;
+			time = ktime_to_ms(ktime_get());
+			if (!pos->need_speedup)
+				pos->resume(pos);
+			else {
+				resume_speedup(pos);
+			}
+			printk(KERN_EMERG "LR handlers [%pf], level: %d cost %lldms\n", 
+				pos->resume, pos->level, ktime_to_ms(ktime_get()) - time);
+#endif /* CONFIG_SPEEDUP_EARLYSUSPEND */
 		}
 	}
 	
@@ -299,6 +326,19 @@ suspend_state_t get_suspend_state(void)
 {
 	return requested_suspend_state;
 }
+
+#ifdef CONFIG_SPEEDUP_EARLYSUSPEND
+void __speedup_earlysuspend_init(void) {
+//Lycan.Wang@Prd.BasicDrv, 2013-08-31 Add for speedup wakeup
+	speedup_earlysuspend_init();
+	speedup_early_suspend_handlers = &early_suspend_handlers;
+}
+
+void __speedup_earlysuspend_exit(void) {
+//Lycan.Wang@Prd.BasicDrv, 2013-08-31 Add for speedup wakeup
+	speedup_earlysuspend_exit();
+}
+#endif /* CONFIG_SPEEDUP_EARLYSUSPEND */
 
 static enum hrtimer_restart earlysuspend_timer_func(struct hrtimer *timer)
 {
@@ -748,4 +788,3 @@ MODULE_AUTHOR("Paul Reioux <reioux@gmail.com> / Jean-Pierre Rasquin <yank555.lu@
 MODULE_DESCRIPTION("power_suspend - A replacement kernel PM driver for"
         "Android's deprecated early_suspend/late_resume PM driver!");
 MODULE_LICENSE("GPL v2");
-

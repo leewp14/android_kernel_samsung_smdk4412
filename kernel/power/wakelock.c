@@ -25,6 +25,11 @@
 #ifdef CONFIG_FAST_BOOT
 #include <linux/delay.h>
 #endif
+#ifdef CONFIG_HAS_EARLYSUSPEND
+#ifdef CONFIG_SPEEDUP_EARLYSUSPEND
+#include <linux/speedup_earlysuspend.h>
+#endif
+#endif
 #include "power.h"
 
 enum {
@@ -646,6 +651,11 @@ static int __init wakelocks_init(void)
 	proc_create("wakelocks", S_IRUGO, NULL, &wakelock_stats_fops);
 #endif
 
+#ifdef CONFIG_SPEEDUP_EARLYSUSPEND
+//Lycan.Wang@Prd.BasicDrv, 2013-08-31 Add for speedup wakeup
+	__speedup_earlysuspend_init();
+#endif /* CONFIG_SPEEDUP_EARLYSUSPEND */
+
 	return 0;
 
 err_sync_work_queue:
@@ -680,6 +690,11 @@ static void  __exit wakelocks_exit(void)
 	wake_lock_destroy(&main_wake_lock);
 #ifdef CONFIG_WAKELOCK_STAT
 	wake_lock_destroy(&deleted_wake_locks);
+
+#ifdef CONFIG_SPEEDUP_EARLYSUSPEND
+//Lycan.Wang@Prd.BasicDrv, 2013-08-31 Add for speedup wakeup
+	__speedup_earlysuspend_exit();
+#endif /* CONFIG_SPEEDUP_EARLYSUSPEND */
 #endif
 }
 
