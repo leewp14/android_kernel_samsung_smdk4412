@@ -29,10 +29,6 @@
 #include <linux/videodev2_exynos_camera.h>
 #endif
 
-#ifdef CONFIG_VIDEO_M5MO_WAKELOCK
-#include "../../../kernel/power/power.h"
-#endif
-
 #include <linux/regulator/machine.h>
 
 #include <media/m5mo_platform.h>
@@ -92,10 +88,6 @@
 			}
 
 #define NELEMS(array) (sizeof(array) / sizeof(array[0]))
-
-#ifdef CONFIG_VIDEO_M5MO_WAKELOCK
-static bool m5mo_wakelock_active = false;
-#endif
 
 static const struct m5mo_frmsizeenum preview_frmsizes[] = {
 	{ M5MO_PREVIEW_QCIF,	176,	144,	0x05 },	/* 176 x 144 */
@@ -948,12 +940,6 @@ static int m5mo_set_flash(struct v4l2_subdev *sd, int val, int force)
 retry:
 	switch (val) {
 	case FLASH_MODE_OFF:
-#ifdef CONFIG_VIDEO_M5MO_WAKELOCK
-		if (m5mo_wakelock_active) {
-			cam_dbg("%s: FLASH_MODE_OFF: release wakelock\n", __func__);
-			pm_wake_unlock("flash");
-		}
-#endif
 		light = 0x00;
 		flash = (state->sensor_mode == SENSOR_CAMERA) ? 0x00 : -1;
 		break;
@@ -969,12 +955,6 @@ retry:
 		break;
 
 	case FLASH_MODE_TORCH:
-#ifdef CONFIG_VIDEO_M5MO_WAKELOCK
-		if (!m5mo_wakelock_active) {
-			cam_dbg("%s: FLASH_MODE_TORCH: acquire wakelock\n", __func__);
-			pm_wake_lock("flash");
-		}
-#endif
 		light = 0x03;
 		flash = -1;
 		break;
