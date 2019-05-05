@@ -972,7 +972,7 @@ retry:
 #ifdef CONFIG_VIDEO_M5MO_WAKELOCK
                 if (!wake_lock_active(&m5mo_wakelock)) {
                         pr_err("%s: FLASH_MODE_OFF: release wakelock\n", __func__);
-                        wake_unlock(&m5mo_wakelock);
+                        wake_lock(&m5mo_wakelock);
                 }
 #endif
 		light = 0x03;
