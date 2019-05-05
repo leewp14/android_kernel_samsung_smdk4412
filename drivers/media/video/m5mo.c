@@ -971,7 +971,7 @@ retry:
 	case FLASH_MODE_TORCH:
 #ifdef CONFIG_VIDEO_M5MO_WAKELOCK
                 if (!wake_lock_active(&m5mo_wakelock)) {
-                        pr_err("%s: FLASH_MODE_OFF: release wakelock\n", __func__);
+			pr_err("%s: FLASH_MODE_TORCH: acquire wakelock\n", __func__);
                         wake_lock(&m5mo_wakelock);
                 }
 #endif
@@ -3032,16 +3032,16 @@ static struct i2c_driver m5mo_i2c_driver = {
 
 static int __init m5mo_mod_init(void)
 {
+
+#ifdef CONFIG_VIDEO_M5MO_WAKELOCK
+        wake_lock_init(&m5mo_wakelock, WAKE_LOCK_SUSPEND, "m5mo_wake_lock");
+#endif
+
 	return i2c_add_driver(&m5mo_i2c_driver);
 }
 
 static void __exit m5mo_mod_exit(void)
 {
-
-#ifdef CONFIG_VIDEO_M5MO_WAKELOCK
-	wake_lock_init(&m5mo_wakelock, WAKE_LOCK_SUSPEND, "m5mo_wake_lock");
-#endif
-
 	i2c_del_driver(&m5mo_i2c_driver);
 	if (camera_class)
 		class_destroy(camera_class);
