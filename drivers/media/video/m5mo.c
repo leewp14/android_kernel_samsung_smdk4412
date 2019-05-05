@@ -29,6 +29,10 @@
 #include <linux/videodev2_exynos_camera.h>
 #endif
 
+#ifdef CONFIG_VIDEO_M5MO_WAKELOCK
+#include <linux/wakelock.h>
+#endif
+
 #include <linux/regulator/machine.h>
 
 #include <media/m5mo_platform.h>
@@ -88,6 +92,10 @@
 			}
 
 #define NELEMS(array) (sizeof(array) / sizeof(array[0]))
+
+#ifdef CONFIG_VIDEO_M5MO_WAKELOCK
+static struct wake_lock m5mo_wakelock;
+#endif
 
 static const struct m5mo_frmsizeenum preview_frmsizes[] = {
 	{ M5MO_PREVIEW_QCIF,	176,	144,	0x05 },	/* 176 x 144 */
@@ -940,6 +948,12 @@ static int m5mo_set_flash(struct v4l2_subdev *sd, int val, int force)
 retry:
 	switch (val) {
 	case FLASH_MODE_OFF:
+#ifdef CONFIG_VIDEO_M5MO_WAKELOCK
+		if (wake_lock_active(&m5mo_wakelock)) {
+			pr_err("%s: FLASH_MODE_OFF: release wakelock\n", __func__);
+			wake_unlock(&m5mo_wakelock);
+		}
+#endif
 		light = 0x00;
 		flash = (state->sensor_mode == SENSOR_CAMERA) ? 0x00 : -1;
 		break;
@@ -955,6 +969,12 @@ retry:
 		break;
 
 	case FLASH_MODE_TORCH:
+#ifdef CONFIG_VIDEO_M5MO_WAKELOCK
+                if (!wake_lock_active(&m5mo_wakelock)) {
+                        pr_err("%s: FLASH_MODE_OFF: release wakelock\n", __func__);
+                        wake_unlock(&m5mo_wakelock);
+                }
+#endif
 		light = 0x03;
 		flash = -1;
 		break;
@@ -3017,6 +3037,11 @@ static int __init m5mo_mod_init(void)
 
 static void __exit m5mo_mod_exit(void)
 {
+
+#ifdef CONFIG_VIDEO_M5MO_WAKELOCK
+	wake_lock_init(&m5mo_wakelock, WAKE_LOCK_SUSPEND, "m5mo_wake_lock");
+#endif
+
 	i2c_del_driver(&m5mo_i2c_driver);
 	if (camera_class)
 		class_destroy(camera_class);
