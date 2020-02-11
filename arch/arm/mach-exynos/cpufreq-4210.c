@@ -83,8 +83,8 @@ static unsigned int clkdiv_cpu0[CPUFREQ_LEVEL_END][7] = {
 	 * { DIVCORE, DIVCOREM0, DIVCOREM1, DIVPERIPH,
 	 *		DIVATB, DIVPCLK_DBG, DIVAPLL }
 	 */
-        { 0, 3, 7, 3, 4, 1, 7 },  /* ARM L0: 1600MHz */
-        { 0, 3, 7, 3, 4, 1, 7 },  /* ARM L1: 1500MHz */
+	{ 0, 3, 7, 3, 4, 1, 7 },  /* ARM L0: 1600MHz */
+	{ 0, 3, 7, 3, 4, 1, 7 },  /* ARM L1: 1500MHz */
 	{ 0, 3, 7, 3, 4, 1, 7 },  /* ARM L2: 1400MHz */
 	{ 0, 3, 7, 3, 4, 1, 7 },  /* ARM L3: 1300MHz */
 	{ 0, 3, 7, 3, 4, 1, 7 },  /* ARM L4: 1200MHz */
@@ -104,8 +104,8 @@ static unsigned int clkdiv_cpu1[CPUFREQ_LEVEL_END][2] = {
 	/* Clock divider value for following
 	 * { DIVCOPY, DIVHPM }
 	 */
-        { 5, 0 },       /* ARM L0: 1600MHz */
-        { 5, 0 },       /* ARM L1: 1500MHz */
+	{ 5, 0 },       /* ARM L0: 1600MHz */
+	{ 5, 0 },       /* ARM L1: 1500MHz */
 	{ 5, 0 },	/* ARM L2: 1400MHz */
 	{ 5, 0 },	/* ARM L3: 1300MHz */
 	{ 5, 0 },	/* ARM L4: 1200MHz */
@@ -170,7 +170,6 @@ static const unsigned int asv_voltage_B[CPUFREQ_LEVEL_END][5] = {
 	 *	   S, A, B, C, D
 	 * N7000 ASV_VOLTAGE_TABLE
 	 */
-
 	{ 1400000, 1400000, 1325000, 1275000, 1225000 }, //1600MHz
 	{ 1375000, 1375000, 1300000, 1250000, 1225000 }, //1500MHz
 	{ 1350000, 1350000, 1300000, 1250000, 1225000 }, //1400MHz
