@@ -565,7 +565,19 @@ KBUILD_CFLAGS	+= -Os
 else ifdef CONFIG_CC_OPTIMIZE_FOR_SPEED
 KBUILD_CFLAGS += -O3
 else ifdef CONFIG_CC_OPTIMIZE_FOR_MAXSPEED
-KBUILD_CFLAGS += -Ofast 
+KBUILD_CFLAGS += -Ofast \
+		 -march=armv7-a \
+		 -mtune=cortex-a9 \
+		 -mfpu=neon \
+		 -mfloat-abi=softfp \
+		 -funsafe-math-optimizations \
+		 -frename-registers \
+		 -funroll-loops \
+		 -fopenmp \
+		 -D_GLIBCXX_PARALLEL \
+		 --param l1-cache-line-size=32 \
+		 --param l1-cache-size=32 \
+		 --param l2-cache-size=1024 \
 else
 KBUILD_CFLAGS	+= -O2
 endif
