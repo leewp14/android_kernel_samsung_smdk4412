@@ -577,7 +577,7 @@ KBUILD_CFLAGS += -Ofast \
 		 -D_GLIBCXX_PARALLEL \
 		 --param l1-cache-line-size=32 \
 		 --param l1-cache-size=32 \
-		 --param l2-cache-size=1024 \
+		 --param l2-cache-size=1024
 else
 KBUILD_CFLAGS	+= -O2
 endif
