@@ -102,9 +102,9 @@ mali_dvfs_table mali_dvfs[MALI_DVFS_STEPS]={
 			/* step 3 */{440  ,1000000	,1025000   ,85   , 90},
 			/* step 4 */{533  ,1000000	,1075000   ,95   ,100} };
 #else
-			/* step 0 */{160  ,1000000	, 950000   ,0    , 70},
-			/* step 1 */{267  ,1000000	,1000000   ,62   , 90},
-			/* step 2 */{533  ,1000000	,1000000   ,80   ,100} };
+			/* step 0 */{100  ,1000000	, 950000   ,0   , 85},
+			/* step 1 */{160  ,1000000	, 950000   ,80   ,90},
+			/* step 2 */{267  ,1000000	,1000000   ,80   ,100} };
 #endif
 
 #ifdef EXYNOS4_ASV_ENABLED
@@ -181,11 +181,11 @@ static unsigned int asv_3d_volt_4210_12_table[MALI_DVFS_STEPS][ASV_LEVEL_4210_12
 };
 
 static unsigned int asv_3d_volt_4210_14_table[MALI_DVFS_STEPS][ASV_LEVEL_4210_14] = {
-	{  1000000,  1000000,   950000,   950000,   950000},	/* L2(160Mhz) */
+ 	{  1000000,  1000000,   950000,   950000,   950000},	/* L2(100Mhz) */
 #if (MALI_DVFS_STEPS > 1)
-	{  1100000,  1100000,  1000000,  1000000,   950000},	/* L1(267Mhz) */
+ 	{  1000000,  1000000,   950000,   950000,   950000},	/* L1(160Mhz) */
 #if (MALI_DVFS_STEPS > 2)
-	{  1100000,  1100000,  1100000,  1100000,  1000000},	/* L0(533Mhz) */
+ 	{  1100000,  1100000,  1000000,  1000000,   950000},	/* L0(267Mhz) */
 #endif
 #endif
 };
@@ -223,7 +223,7 @@ int mali_gpu_vol = 1025000;
 /* Orion */
 static const mali_bool bis_vpll = MALI_FALSE;
 int mali_gpu_clk = 267;
-int mali_gpu_vol = 1000000;
+int mali_gpu_vol = 1050000;
 #endif
 
 static unsigned int GPU_MHZ	= 1000000;

@@ -170,8 +170,8 @@ static const unsigned int asv_voltage_B[CPUFREQ_LEVEL_END][5] = {
 	 *	   S, A, B, C, D
 	 * N7000 ASV_VOLTAGE_TABLE
 	 */
-	{ 1400000, 1400000, 1325000, 1275000, 1225000 }, //1600MHz
-	{ 1375000, 1375000, 1300000, 1250000, 1225000 }, //1500MHz
+	{ 1375000, 1350000, 1300000, 1250000, 1225000 }, //1600MHz
+	{ 1375000, 1350000, 1300000, 1250000, 1225000 }, //1500MHz
 	{ 1350000, 1350000, 1300000, 1250000, 1225000 }, //1400MHz
 	{ 1325000, 1325000, 1250000, 1200000, 1175000 }, //1300MHz
 	{ 1325000, 1275000, 1225000, 1175000, 1150000 }, //1200MHz
@@ -335,7 +335,7 @@ static void __init set_volt_table(void)
 		max_support_idx = L0;
 #else
 		for_1400 = true;
-		max_support_idx = L2;
+		max_support_idx = L1;
 #endif
 		break;
 	case SUPPORT_1200MHZ:
