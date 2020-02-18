@@ -280,8 +280,7 @@ static void cpufreq_zenx_timer(unsigned long data)
 	spin_unlock_irqrestore(&speedchange_cpumask_lock, flags);
 	wake_up_process(speedchange_task);
 
-	/* Set current load on this CPU */
-	pcpu->cur_load = cpu_load;
+	pcpu->cur_load = load_since_change;
 	spin_lock_irqsave(&hotplug_cpumask_lock, flags);
 	cpumask_set_cpu(data, &hotplug_cpumask);
 	spin_unlock_irqrestore(&hotplug_cpumask_lock, flags);
@@ -481,18 +480,14 @@ static int cpufreq_zenx_hotplug_task(void *data)
 						now - pjcpu->last_time_above_unplug_time;
 				}
 
-				/*
-				 * If CPU is not online, it must be offline so there should
-				 * be no need to do another cpu_online check.
-				 * Also avoid the likely/unlikely branch prediction macros
-				 * as we have no idea if it's online or offline.
-				 */
 				if (cpu_online(j) &&
-					pjcpu->total_below_unplug_time > unplug_delay) {
+				    pjcpu->total_below_unplug_time > unplug_delay) {
 					mutex_lock(&set_speed_lock);
 					cpu_down(j);
 					mutex_unlock(&set_speed_lock);
-				} else if (pjcpu->total_above_unplug_time > insert_delay) {
+				}
+				if (cpu_is_offline(j) &&
+				    pjcpu->total_above_unplug_time > insert_delay) {
 					mutex_lock(&set_speed_lock);
 					cpu_up(j);
 					mutex_unlock(&set_speed_lock);
