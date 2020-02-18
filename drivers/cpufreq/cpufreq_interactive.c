@@ -73,6 +73,13 @@ static u64 hispeed_freq;
 #define DEFAULT_GO_HISPEED_LOAD 85
 static unsigned long go_hispeed_load;
 
+/* Target load.  Lower values result in higher CPU speeds. */
+#define DEFAULT_TARGET_LOAD 90
+static unsigned int default_target_loads[] = {DEFAULT_TARGET_LOAD};
+static spinlock_t target_loads_lock;
+static unsigned int *target_loads = default_target_loads;
+static int ntarget_loads = ARRAY_SIZE(default_target_loads);
+
 /*
  * The minimum amount of time to spend at a frequency before we can ramp down.
  */
@@ -200,7 +207,7 @@ static void cpufreq_interactive_timer(unsigned long data)
 		if (pcpu->target_freq <= pcpu->policy->min) {
 			new_freq = hispeed_freq;
 		} else {
-			new_freq = pcpu->policy->max * cpu_load / 100;
+			new_freq = choose_freq(pcpu, loadadjfreq);
 
 			if (new_freq < hispeed_freq)
 				new_freq = hispeed_freq;
@@ -217,7 +224,7 @@ static void cpufreq_interactive_timer(unsigned long data)
 			}
 		}
 	} else {
-		new_freq = pcpu->policy->max * cpu_load / 100;
+		new_freq = choose_freq(pcpu, loadadjfreq);
 	}
 
 	if (new_freq <= hispeed_freq)
@@ -620,6 +627,80 @@ static struct input_handler cpufreq_interactive_input_handler = {
 	.id_table       = cpufreq_interactive_ids,
 };
 
+static ssize_t show_target_loads(
+	struct kobject *kobj, struct attribute *attr, char *buf)
+{
+	int i;
+	ssize_t ret = 0;
+
+	spin_lock(&target_loads_lock);
+
+	for (i = 0; i < ntarget_loads; i++)
+		ret += sprintf(buf + ret, "%u%s", target_loads[i],
+			       i & 0x1 ? ":" : " ");
+
+	ret += sprintf(buf + ret, "\n");
+	spin_unlock(&target_loads_lock);
+	return ret;
+}
+
+static ssize_t store_target_loads(
+	struct kobject *kobj, struct attribute *attr, const char *buf,
+	size_t count)
+{
+	int ret;
+	const char *cp;
+	unsigned int *new_target_loads = NULL;
+	int ntokens = 1;
+	int i;
+
+	cp = buf;
+	while ((cp = strpbrk(cp + 1, " :")))
+		ntokens++;
+
+	if (!(ntokens & 0x1))
+		goto err_inval;
+
+	new_target_loads = kmalloc(ntokens * sizeof(unsigned int), GFP_KERNEL);
+	if (!new_target_loads) {
+		ret = -ENOMEM;
+		goto err;
+	}
+
+	cp = buf;
+	i = 0;
+	while (i < ntokens) {
+		if (sscanf(cp, "%u", &new_target_loads[i++]) != 1)
+			goto err_inval;
+
+		cp = strpbrk(cp, " :");
+		if (!cp)
+			break;
+		cp++;
+	}
+
+	if (i != ntokens)
+		goto err_inval;
+
+	spin_lock(&target_loads_lock);
+	if (target_loads != default_target_loads)
+		kfree(target_loads);
+	target_loads = new_target_loads;
+	ntarget_loads = ntokens;
+	spin_unlock(&target_loads_lock);
+	return count;
+
+err_inval:
+	ret = -EINVAL;
+err:
+	kfree(new_target_loads);
+	return ret;
+}
+
+static struct global_attr target_loads_attr =
+	__ATTR(target_loads, S_IRUGO | S_IWUSR,
+		show_target_loads, store_target_loads);
+
 static ssize_t show_hispeed_freq(struct kobject *kobj,
 				 struct attribute *attr, char *buf)
 {
@@ -802,6 +883,7 @@ static struct global_attr boostpulse =
 	__ATTR(boostpulse, 0200, NULL, store_boostpulse);
 
 static struct attribute *interactive_attributes[] = {
+	&target_loads_attr.attr,
 	&hispeed_freq_attr.attr,
 	&go_hispeed_load_attr.attr,
 	&above_hispeed_delay.attr,
