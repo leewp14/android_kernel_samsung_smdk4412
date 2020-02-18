@@ -31,6 +31,7 @@
 #include <linux/workqueue.h>
 #include <linux/kthread.h>
 #include <linux/slab.h>
+#include <linux/earlysuspend.h>
 
 #include <asm/cputime.h>
 
@@ -76,9 +77,8 @@ static cpumask_t speedchange_cpumask;
 static spinlock_t speedchange_cpumask_lock;
 static struct mutex set_speed_lock;
 
-/* workqueue handles hotplugging */
-static struct workqueue_struct *hotplug_wq;
-static struct work_struct hotplug_work;
+/* realtime thread handles hotplugging */
+static struct task_struct *hotplug_task;
 static cpumask_t hotplug_cpumask;
 static spinlock_t hotplug_cpumask_lock;
 
@@ -366,8 +366,6 @@ static void cpufreq_zenx_timer(unsigned long data)
 		}
 	}
 
-	pcpu->cur_load = load_since_change;
-
 	pcpu->floor_freq = new_freq;
 	pcpu->floor_validate_time = now;
 
@@ -389,10 +387,12 @@ static void cpufreq_zenx_timer(unsigned long data)
 	spin_unlock_irqrestore(&speedchange_cpumask_lock, flags);
 	wake_up_process(speedchange_task);
 
+	/* Set current load on this CPU */
+	pcpu->cur_load = load_since_change;
 	spin_lock_irqsave(&hotplug_cpumask_lock, flags);
 	cpumask_set_cpu(data, &hotplug_cpumask);
 	spin_unlock_irqrestore(&hotplug_cpumask_lock, flags);
-	queue_work(hotplug_wq, &hotplug_work);
+	wake_up_process(hotplug_task);
 
 rearm_if_notmax:
 	/*
@@ -489,7 +489,7 @@ static void cpufreq_zenx_idle_end(void)
 	up_read(&pcpu->mutex);
 }
 
-static void cpufreq_zenx_hotplug_work(struct work_struct *work)
+static int cpufreq_zenx_hotplug_task(void *data)
 {
 	u64 now;
 	cpumask_t tmp_mask;
@@ -497,106 +497,120 @@ static void cpufreq_zenx_hotplug_work(struct work_struct *work)
 	unsigned long flags;
 	struct cpufreq_zenx_cpuinfo *pcpu;
 
-	spin_lock_irqsave(&hotplug_cpumask_lock, flags);
-	tmp_mask = hotplug_cpumask;
-	cpumask_clear(&hotplug_cpumask);
-	spin_unlock_irqrestore(&hotplug_cpumask_lock, flags);
+	while (1) {
+		set_current_state(TASK_INTERRUPTIBLE);
+		spin_lock_irqsave(&hotplug_cpumask_lock, flags);
 
-	get_cpu_idle_time_us(smp_processor_id(), &now);
+		if (cpumask_empty(&hotplug_cpumask)) {
+			spin_unlock_irqrestore(&hotplug_cpumask_lock,
+					       flags);
+			schedule();
 
-	for_each_cpu(cpu, &tmp_mask) {
-		unsigned int j, avg_load;
-		unsigned int total_load = 0;
-
-		/* Only do hotplug work on CPU 0 */
-		if (cpu > 0)
-			continue;
-
-		pcpu = &per_cpu(cpuinfo, cpu);
-
-		if (!down_read_trylock(&pcpu->mutex))
-			continue;
-		if (!pcpu->governor_enabled) {
-			up_read(&pcpu->mutex);
-			continue;
-		}
-
-		/*
-		 * Compute average CPU load
-		 * Use cpu_online_mask to get the load across
-		 * all online CPUs.
-		 */
-		for_each_cpu(j, cpu_online_mask) {
-			struct cpufreq_zenx_cpuinfo *pjcpu =
-				&per_cpu(cpuinfo, j);
-
-				total_load += pjcpu->cur_load;
-		}
-		avg_load = total_load / num_online_cpus();
-
-		/*
-		 * Determine which CPUs to remove/insert.
-		 * Use cpu_possible_mask so we get online
-		 * and offline CPUs.
-		 */
-		for_each_possible_cpu(j) {
-			struct cpufreq_zenx_cpuinfo *pjcpu;
-
-			if (j == 0)
-				continue;
-			else if (j > 3)
+			if (kthread_should_stop())
 				break;
 
-			pjcpu = &per_cpu(cpuinfo, j);
+			spin_lock_irqsave(&hotplug_cpumask_lock, flags);
+		}
 
-			/*
-			 * The logic for hotplugging works as follows:
-			 * if avg_load <= unplug_load[cpu], reset timers
-			 * about how long we've been ABOVE it and
-			 * figure out how long it has been since we've
-			 * been below unplug_load.
-			 * Logic works the same for last time we were above
-			 * unplug_load.
-			 */
-			if (avg_load <= unplug_load[j - 1]) {
-				/* Below: reset above counter */
-				pjcpu->total_above_unplug_time = 0;
-				pjcpu->last_time_above_unplug_time = 0;
-				if (!pjcpu->last_time_below_unplug_time)
-					pjcpu->last_time_below_unplug_time = now;
-				pjcpu->total_below_unplug_time +=
-					now - pjcpu->last_time_below_unplug_time;
-			}
-			if (avg_load > unplug_load[j - 1]) {
-				/* Above: reset below counter */
-				pjcpu->total_below_unplug_time = 0;
-				pjcpu->last_time_below_unplug_time = 0;
-				if (!pjcpu->last_time_above_unplug_time)
-					pjcpu->last_time_above_unplug_time = now;
-				pjcpu->total_above_unplug_time +=
-					now - pjcpu->last_time_above_unplug_time;
+		set_current_state(TASK_RUNNING);
+		tmp_mask = hotplug_cpumask;
+		cpumask_clear(&hotplug_cpumask);
+		spin_unlock_irqrestore(&hotplug_cpumask_lock, flags);
+
+		get_cpu_idle_time_us(smp_processor_id(), &now);
+
+		for_each_cpu(cpu, &tmp_mask) {
+			unsigned int j, avg_load;
+			unsigned int total_load = 0;
+
+			pcpu = &per_cpu(cpuinfo, cpu);
+
+			if (!down_read_trylock(&pcpu->mutex))
+				continue;
+			if (!pcpu->governor_enabled) {
+				up_read(&pcpu->mutex);
+				continue;
 			}
 
 			/*
-			 * If CPU is not online, it must be offline so there should
-			 * be no need to do another cpu_online check.
-			 * Also avoid the likely/unlikely branch prediction macros
-			 * as we have no idea if it's online or offline.
+			 * Compute average CPU load
+			 * Use cpu_online_mask to get the load across
+			 * all online CPUs.
 			 */
-			if (cpu_online(j) &&
-				pjcpu->total_below_unplug_time > unplug_delay) {
-				mutex_lock(&set_speed_lock);
-				cpu_down(j);
-				mutex_unlock(&set_speed_lock);
-			} else if (pjcpu->total_above_unplug_time > insert_delay) {
-				mutex_lock(&set_speed_lock);
-				cpu_up(j);
-				mutex_unlock(&set_speed_lock);
+			for_each_cpu(j, cpu_online_mask) {
+				struct cpufreq_zenx_cpuinfo *pjcpu =
+					&per_cpu(cpuinfo, j);
+
+				total_load += pjcpu->cur_load;
+			}
+			avg_load = total_load / num_online_cpus();
+
+			/*
+			 * Determine which CPUs to remove/insert.
+			 * Use cpu_possible_mask so we get online
+			 * and offline CPUs.
+			 */
+			for_each_possible_cpu(j) {
+				struct cpufreq_zenx_cpuinfo *pjcpu;
+
+				if (j == 0)
+					continue;
+				else if (j > 3)
+					break;
+
+				pjcpu = &per_cpu(cpuinfo, j);
+
+				/*
+				 * The logic for hotplugging works as follows:
+				 * if avg_load <= unplug_load[cpu], reset timers
+				 * about how long we've been ABOVE it and
+				 * figure out how long it has been since we've
+				 * been below unplug_load.
+				 * Logic works the same for last time we were above
+				 * unplug_load.
+				 */
+				if (avg_load <= unplug_load[j - 1]) {
+					/* Below: reset above counter */
+					pjcpu->total_above_unplug_time = 0;
+					pjcpu->last_time_above_unplug_time = 0;
+					if (!pjcpu->last_time_below_unplug_time)
+						pjcpu->last_time_below_unplug_time = now;
+					pjcpu->total_below_unplug_time +=
+						now - pjcpu->last_time_below_unplug_time;
+				}
+				if (avg_load > unplug_load[j - 1]) {
+					/* Above: reset below counter */
+					pjcpu->total_below_unplug_time = 0;
+					pjcpu->last_time_below_unplug_time = 0;
+					if (!pjcpu->last_time_above_unplug_time)
+						pjcpu->last_time_above_unplug_time = now;
+					pjcpu->total_above_unplug_time +=
+						now - pjcpu->last_time_above_unplug_time;
+				}
+
+				/*
+				 * If CPU is not online, it must be offline so there should
+				 * be no need to do another cpu_online check.
+				 * Also avoid the likely/unlikely branch prediction macros
+				 * as we have no idea if it's online or offline.
+				 */
+				if (cpu_online(j) &&
+					pjcpu->total_below_unplug_time > unplug_delay) {
+					mutex_lock(&set_speed_lock);
+					cpu_down(j);
+					mutex_unlock(&set_speed_lock);
+				} else if (pjcpu->total_above_unplug_time > insert_delay) {
+					mutex_lock(&set_speed_lock);
+					cpu_up(j);
+					mutex_unlock(&set_speed_lock);
+				}
 			}
 
 			up_read(&pcpu->mutex);
 		}
 	}
+
+	return 0;
 }
 
 static int cpufreq_zenx_speedchange_task(void *data)
@@ -1067,6 +1081,35 @@ static struct attribute_group zenx_attr_group = {
 	.name = "zenx",
 };
 
+#ifdef CONFIG_EARLYSUSPEND
+/*
+ * Enable all CPUs when waking up the device
+ */
+static void zenx_late_resume(struct early_suspend *handler) {
+	unsigned int cpu;
+	struct cpufreq_zenx_cpuinfo *pcpu;
+
+	for_each_cpu_not(cpu, cpu_online_mask) {
+		pcpu = &per_cpu(cpuinfo, cpu);
+		if (!down_read_trylock(&pcpu->mutex))
+			continue;
+		if (!pcpu->governor_enabled) {
+			up_read(&pcpu->mutex);
+			continue;
+		}
+		mutex_lock(&set_speed_lock);
+		cpu_up(cpu);
+		mutex_unlock(&set_speed_lock);
+		up_read(&pcpu->mutex);
+	}
+}
+
+static struct early_suspend zenx_early_suspend = {
+	.resume = zenx_late_resume,
+	.level = EARLY_SUSPEND_LEVEL_DISABLE_FB + 1,
+};
+#endif
+
 static int cpufreq_zenx_idle_notifier(struct notifier_block *nb,
 					     unsigned long val,
 					     void *data)
@@ -1120,9 +1163,7 @@ static int cpufreq_governor_zenx(struct cpufreq_policy *policy,
 				pcpu->target_set_time;
 			pcpu->governor_enabled = 1;
 			pcpu->total_below_unplug_time = 0;
-			pcpu->total_above_unplug_time = 0;
 			pcpu->last_time_below_unplug_time = 0;
-			pcpu->last_time_above_unplug_time = 0;
 			pcpu->cur_load = 0;
 			smp_wmb();
 			pcpu->cpu_timer.expires =
@@ -1142,6 +1183,9 @@ static int cpufreq_governor_zenx(struct cpufreq_policy *policy,
 		if (rc)
 			return rc;
 
+#ifdef CONFIG_EARLYSUSPEND
+		register_early_suspend(&zenx_early_suspend);
+#endif
 		idle_notifier_register(&cpufreq_zenx_idle_nb);
 		break;
 
@@ -1161,6 +1205,9 @@ static int cpufreq_governor_zenx(struct cpufreq_policy *policy,
 		sysfs_remove_group(cpufreq_global_kobject,
 				&zenx_attr_group);
 
+#ifdef CONFIG_EARLYSUSPEND
+		unregister_early_suspend(&zenx_early_suspend);
+#endif
 		/*
 		 * XXX BIG CAVEAT: Stopping the governor with CPU1 offline
 		 * will result in it remaining offline until the user onlines
@@ -1224,15 +1271,18 @@ static int __init cpufreq_zenx_init(void)
 	/* NB: wake up so the thread does not look hung to the freezer */
 	wake_up_process(speedchange_task);
 
-	hotplug_wq = alloc_workqueue("hpzenx", 0, 1);
-	if (!hotplug_wq) {
-		put_task_struct(speedchange_task);
-		return -ENOMEM;
-	}
-
-	INIT_WORK(&hotplug_work, cpufreq_zenx_hotplug_work);
-
 	spin_lock_init(&hotplug_cpumask_lock);
+	hotplug_task =
+		kthread_create(cpufreq_zenx_hotplug_task, NULL,
+				"hpzenx");
+	if (IS_ERR(hotplug_task))
+		return PTR_ERR(hotplug_task);
+
+	sched_setscheduler_nocheck(hotplug_task, SCHED_FIFO, &param);
+	get_task_struct(hotplug_task);
+
+	/* NB: wake up so the thread does not look hung to the freezer */
+	wake_up_process(hotplug_task);
 
 	return cpufreq_register_governor(&cpufreq_gov_zenx);
 }
@@ -1246,9 +1296,11 @@ module_init(cpufreq_zenx_init);
 static void __exit cpufreq_zenx_exit(void)
 {
 	cpufreq_unregister_governor(&cpufreq_gov_zenx);
+	/* Stop the threads */
 	kthread_stop(speedchange_task);
 	put_task_struct(speedchange_task);
-	destroy_workqueue(hotplug_wq);
+	kthread_stop(hotplug_task);
+	put_task_struct(hotplug_task);
 }
 
 module_exit(cpufreq_zenx_exit);
