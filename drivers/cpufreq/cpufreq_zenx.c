@@ -270,7 +270,6 @@ static void cpufreq_zenx_timer(unsigned long data)
 	unsigned int delta_idle;
 	unsigned int delta_time;
 	int cpu_load;
-	int load_since_change;
 	struct cpufreq_zenx_cpuinfo *pcpu =
 		&per_cpu(cpuinfo, data);
 	u64 now_idle;
@@ -298,15 +297,6 @@ static void cpufreq_zenx_timer(unsigned long data)
 		cpu_load = 0;
 	else
 		cpu_load = 100 * (delta_time - delta_idle) / delta_time;
-
-	delta_idle = (unsigned int)(now_idle - pcpu->target_set_time_in_idle);
-	delta_time = (unsigned int)(now - pcpu->target_set_time);
-
-	if ((delta_time == 0) || (delta_idle > delta_time))
-		load_since_change = 0;
-	else
-		load_since_change =
-			100 * (delta_time - delta_idle) / delta_time;
 
 	if ((cpu_load >= go_hispeed_load || boost_val) &&
 	    pcpu->target_freq < hispeed_freq)
@@ -348,7 +338,7 @@ static void cpufreq_zenx_timer(unsigned long data)
 		}
 	}
 
-	pcpu->cur_load = load_since_change;
+	pcpu->cur_load = cpu_load;
 	pcpu->floor_freq = new_freq;
 	pcpu->floor_validate_time = now;
 
