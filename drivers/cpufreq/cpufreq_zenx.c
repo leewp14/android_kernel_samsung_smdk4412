@@ -388,7 +388,7 @@ static void cpufreq_zenx_timer(unsigned long data)
 	wake_up_process(speedchange_task);
 
 	/* Set current load on this CPU */
-	pcpu->cur_load = load_since_change;
+	pcpu->cur_load = cpu_load;
 	spin_lock_irqsave(&hotplug_cpumask_lock, flags);
 	cpumask_set_cpu(data, &hotplug_cpumask);
 	spin_unlock_irqrestore(&hotplug_cpumask_lock, flags);
