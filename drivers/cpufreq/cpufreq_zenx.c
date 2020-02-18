@@ -132,12 +132,11 @@ static unsigned long timer_rate;
 #define DEFAULT_ABOVE_HISPEED_DELAY DEFAULT_TIMER_RATE
 static unsigned long above_hispeed_delay_val;
 
-/* Non-zero means indefinite speed boost active */
+/*
+ * Non-zero means longer-term speed boost active.
+ */
+
 static int boost_val;
-/* Duration of a boot pulse in usecs */
-static int boostpulse_duration_val = DEFAULT_MIN_SAMPLE_TIME;
-/* End time of boost pulse in ktime converted to usecs */
-static u64 boostpulse_endtime;
 
 static bool governidle;
 module_param(governidle, bool, S_IWUSR | S_IRUGO);
@@ -309,7 +308,6 @@ static void cpufreq_zenx_timer(unsigned long data)
 	unsigned int call_hp_add = 0;
 	unsigned int call_hp_remove = 0;
 	unsigned long flags;
-	bool boosted;
 
 	if (!down_read_trylock(&pcpu->mutex))
 		return;
@@ -329,7 +327,6 @@ static void cpufreq_zenx_timer(unsigned long data)
 	do_div(cputime_speedadj, delta_time);
 	loadadjfreq = (unsigned int)cputime_speedadj * 100;
 	cpu_load = loadadjfreq / pcpu->target_freq;
-	boosted = boost_val || now < boostpulse_endtime;
 
 	pcpu->last_cpu_load = cpu_load;
 
@@ -368,7 +365,7 @@ static void cpufreq_zenx_timer(unsigned long data)
 			goto call_hp_work;
 	}
 
-	if ((cpu_load >= go_hispeed_load || boosted) &&
+	if ((cpu_load >= go_hispeed_load || boost_val) &&
 	    pcpu->target_freq < hispeed_freq)
 		new_freq = hispeed_freq;
 	else
@@ -408,18 +405,8 @@ static void cpufreq_zenx_timer(unsigned long data)
 		}
 	}
 
-	/*
-	 * Update the timestamp for checking whether speed has been held at
-	 * or above the selected frequency for a minimum of min_sample_time,
-	 * if not boosted to hispeed_freq.  If boosted to hispeed_freq then we
-	 * allow the speed to drop as soon as the boostpulse duration expires
-	 * (or the indefinite boost is turned off).
-	 */
-
-	if (!boosted || new_freq > hispeed_freq) {
-		pcpu->floor_freq = new_freq;
-		pcpu->floor_validate_time = now;
-	}
+	pcpu->floor_freq = new_freq;
+	pcpu->floor_validate_time = now;
 
 	if (pcpu->target_freq == new_freq) {
 		trace_cpufreq_zenx_already(
@@ -1075,7 +1062,6 @@ static ssize_t store_boostpulse(struct kobject *kobj, struct attribute *attr,
 	if (ret < 0)
 		return ret;
 
-	boostpulse_endtime = ktime_to_us(ktime_get()) + boostpulse_duration_val;
 	trace_cpufreq_zenx_boost("pulse");
 	cpufreq_zenx_boost();
 	return count;
@@ -1083,29 +1069,6 @@ static ssize_t store_boostpulse(struct kobject *kobj, struct attribute *attr,
 
 static struct global_attr boostpulse =
 	__ATTR(boostpulse, 0200, NULL, store_boostpulse);
-
-static ssize_t show_boostpulse_duration(
-	struct kobject *kobj, struct attribute *attr, char *buf)
-{
-	return sprintf(buf, "%d\n", boostpulse_duration_val);
-}
-
-static ssize_t store_boostpulse_duration(
-	struct kobject *kobj, struct attribute *attr, const char *buf,
-	size_t count)
-{
-	int ret;
-	unsigned long val;
-
-	ret = kstrtoul(buf, 0, &val);
-	if (ret < 0)
-		return ret;
-
-	boostpulse_duration_val = val;
-	return count;
-}
-
-define_one_global_rw(boostpulse_duration);
 
 static struct attribute *zenx_attributes[] = {
 	&target_loads_attr.attr,
@@ -1121,7 +1084,6 @@ static struct attribute *zenx_attributes[] = {
 	&timer_rate_attr.attr,
 	&boost.attr,
 	&boostpulse.attr,
-	&boostpulse_duration.attr,
 	NULL,
 };
 
