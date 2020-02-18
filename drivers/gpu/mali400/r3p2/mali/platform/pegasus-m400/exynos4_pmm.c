@@ -88,9 +88,9 @@ typedef struct mali_runtime_resumeTag{
 }mali_runtime_resume_table;
 
 #if defined(CONFIG_CPU_EXYNOS4212) || defined(CONFIG_CPU_EXYNOS4412)
-mali_runtime_resume_table mali_runtime_resume = {266, 900000, 1};
+mali_runtime_resume_table mali_runtime_resume = {266,  900000, 1}; /* step 1 */
 #else
-mali_runtime_resume_table mali_runtime_resume = {160, 950000, 0};
+mali_runtime_resume_table mali_runtime_resume = {267, 1100000, 1}; /* step 1 */
 #endif
 
 /* dvfs table */
@@ -181,11 +181,11 @@ static unsigned int asv_3d_volt_4210_12_table[MALI_DVFS_STEPS][ASV_LEVEL_4210_12
 };
 
 static unsigned int asv_3d_volt_4210_14_table[MALI_DVFS_STEPS][ASV_LEVEL_4210_14] = {
- 	{  1000000,  1000000,   950000,   950000,   950000},	/* L2(100Mhz) */
+	{  1000000,  1000000,   950000,   950000,   950000},	/* L2(100Mhz) */
 #if (MALI_DVFS_STEPS > 1)
- 	{  1000000,  1000000,   950000,   950000,   950000},	/* L1(160Mhz) */
+	{  1000000,  1000000,   950000,   950000,   950000},	/* L1(160Mhz) */
 #if (MALI_DVFS_STEPS > 2)
- 	{  1100000,  1100000,  1000000,  1000000,   950000},	/* L0(267Mhz) */
+	{  1100000,  1100000,  1000000,  1000000,   950000},	/* L0(267Mhz) */
 #endif
 #endif
 };
