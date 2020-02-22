@@ -6545,7 +6545,7 @@ static struct max17042_platform_data s5pv310_max17042_info = {
 	.alert_init_size = sizeof(max17042_alert_init_data),
 	.alert_gpio = GPIO_FUEL_ALERT,
 	.alert_irq = 0,
-	.enable_current_sense = false,
+	.enable_current_sense = true,
 	.enable_gauging_temperature = true,
 #ifdef RECAL_SOC_FOR_MAXIM
 	.need_soc_recal = max17042_need_soc_recal,
@@ -6922,7 +6922,7 @@ static struct s3cfb_lcd s6e8aa0 = {
 	.p_height = 106,
 	.bpp = 24,
 
-	.freq = 57,
+	.freq = 59.94,
 
 	/* minumun value is 0 except for wr_act time. */
 	.cpu_timing = {
@@ -7500,17 +7500,17 @@ static struct platform_device *smdkc210_devices[] __initdata = {
 /* below temperature base on the celcius degree */
 struct s5p_platform_tmu u1_tmu_data __initdata = {
 	.ts = {
-		.stop_1st_throttle  = 71,
-		.start_1st_throttle = 74,
-		.stop_2nd_throttle  = 87,
-		.start_2nd_throttle = 103,
-		.start_tripping     = 110,
-		.start_emergency    = 120,
-		.stop_mem_throttle  = 85,
-		.start_mem_throttle = 90,
+		.stop_1st_throttle  = 62,
+		.start_1st_throttle = 67,
+		.stop_2nd_throttle  = 69,
+		.start_2nd_throttle = 74,
+		.start_tripping     = 100,
+		.start_emergency    = 105,
+		.stop_mem_throttle  = 80,
+		.start_mem_throttle = 85,
 	},
 	.cpufreq = {
-		.limit_1st_throttle  = 1400000, /* 1400MHz in KHz order */
+		.limit_1st_throttle  = 1200000, /* 1400MHz in KHz order */
 		.limit_2nd_throttle  = 1000000, /* 1000MHz in KHz order */
 	},
 };
@@ -8061,7 +8061,7 @@ static void __init smdkc210_machine_init(void)
 #endif
 
 #if defined(CONFIG_VIDEO_MFC5X)
-	exynos4_mfc_setup_clock(&s5p_device_mfc.dev, 200 * MHZ);
+	exynos4_mfc_setup_clock(&s5p_device_mfc.dev, 267 * MHZ);
 #endif
 #if defined(CONFIG_VIDEO_SAMSUNG_S5P_MFC)
 	dev_set_name(&s5p_device_mfc.dev, "s3c-mfc");
