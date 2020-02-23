@@ -39,7 +39,7 @@
 
 #ifdef CONFIG_CPU_EXYNOS4210
 #define MALI_DVFS_STEPS 2
-#define MALI_DVFS_WATING 5 /* msec */
+#define MALI_DVFS_WATING 100 /* msec */
 #define MALI_DVFS_DEFAULT_STEP 1
 #else
 #define MALI_DVFS_STEPS 5
