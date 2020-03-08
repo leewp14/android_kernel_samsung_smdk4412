@@ -1763,7 +1763,7 @@ static struct fimg2d_platdata fimg2d_data __initdata = {
 	.parent_clkname = "mout_g2d0",
 	.clkname = "sclk_fimg2d",
 	.gate_clkname = "fimg2d",
-	.clkrate = 267 * 1000000,	/* 266 Mhz */
+	.clkrate = 100 * 1000000,	/* 100 Mhz */
 };
 #endif
 
@@ -8061,7 +8061,7 @@ static void __init smdkc210_machine_init(void)
 #endif
 
 #if defined(CONFIG_VIDEO_MFC5X)
-	exynos4_mfc_setup_clock(&s5p_device_mfc.dev, 190 * MHZ);
+	exynos4_mfc_setup_clock(&s5p_device_mfc.dev, 100 * MHZ);
 #endif
 #if defined(CONFIG_VIDEO_SAMSUNG_S5P_MFC)
 	dev_set_name(&s5p_device_mfc.dev, "s3c-mfc");
