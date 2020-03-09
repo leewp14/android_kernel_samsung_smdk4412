@@ -47,7 +47,7 @@
 
 #define MAX_LOAD		100
 #define DIVIDING_FACTOR		10000
-#define UP_THRESHOLD_DEFAULT	25
+#define UP_THRESHOLD_DEFAULT	23
 
 #define SYSFS_DEBUG_BUSFREQ
 
@@ -79,7 +79,6 @@ static DEFINE_MUTEX(set_bus_freq_lock);
 enum busfreq_level_idx {
 	LV_0,
 	LV_1,
-	LV_2,
 	LV_END
 };
 
@@ -104,13 +103,6 @@ struct busfreq_table {
 static struct busfreq_table exynos4_busfreq_table[] = {
 	{LV_0, 400000, 1100000, 0, 0},
 	{LV_1, 267000, 1000000, 0, 0},
-#ifdef CONFIG_BUSFREQ_L2_160M
-	/*L2: 160MHz */
-	{LV_2, 190000, 1000000, 0, 0},
-#else
-	/* L2: 133MHz */
-	{LV_2, 133000, 950000, 0, 0},
-#endif
 	{0, 0, 0, 0, 0},
 };
 
@@ -130,10 +122,8 @@ static unsigned int exynos4_qos_value[BUS_QOS_MAX][LV_END][4] = {
 	{
 		{0x00, 0x00, 0x00, 0x00},
 		{0x00, 0x00, 0x00, 0x00},
-		{0x00, 0x00, 0x00, 0x00},
 	},
 	{
-		{0x00, 0x00, 0x00, 0x00},
 		{0x00, 0x00, 0x00, 0x00},
 		{0x00, 0x00, 0x00, 0x00},
 	}
@@ -142,11 +132,9 @@ static unsigned int exynos4_qos_value[BUS_QOS_MAX][LV_END][4] = {
 static unsigned int exynos4_qos_value[BUS_QOS_MAX][LV_END][4] = {
 	{
 		{0x00, 0x00, 0x00, 0x00},
-		{0x00, 0x00, 0x00, 0x00},
 		{0x06, 0x0b, 0x00, 0x00},
 	},
 	{
-		{0x00, 0x00, 0x00, 0x00},
 		{0x00, 0x00, 0x00, 0x00},
 		{0x06, 0x0b, 0x00, 0x00},
 	}
@@ -155,11 +143,9 @@ static unsigned int exynos4_qos_value[BUS_QOS_MAX][LV_END][4] = {
 static unsigned int exynos4_qos_value[BUS_QOS_MAX][LV_END][4] = {
 	{
 		{0x06, 0x03, 0x06, 0x2f},
-		{0x06, 0x03, 0x06, 0x2f},
 		{0x03, 0x0b, 0x00, 0x00},
 	},
 	{
-		{0x06, 0x0b, 0x00, 0x00},
 		{0x06, 0x0b, 0x00, 0x00},
 		{0x03, 0x0b, 0x00, 0x00},
 	}
@@ -169,11 +155,11 @@ static unsigned int exynos4_qos_value[BUS_QOS_MAX][LV_END][4] = {
 
 #define ASV_GROUP	5
 static unsigned int exynos4_asv_volt[ASV_GROUP][LV_END] = {
-	{1150000, 1050000, 1050000},
-	{1125000, 1025000, 1025000},
-	{1100000, 1000000, 1000000},
-	{1075000, 975000, 975000},
-	{1050000, 950000, 950000},
+	{ 1150000, 1050000 },
+	{ 1125000, 1025000 },
+	{ 1100000, 1000000 },
+	{ 1075000,  975000 },
+	{ 1050000,  950000 },
 };
 
 static unsigned int clkdiv_dmc0[LV_END][8] = {
@@ -188,14 +174,6 @@ static unsigned int clkdiv_dmc0[LV_END][8] = {
 
 	/* DMC L1: 266.7MHz */
 	{ 4, 2, 1, 2, 1, 1, 3, 1 },
-
-#ifdef CONFIG_BUSFREQ_L2_160M
-	/* DMC L2: 160MHz */
-	{ 5, 1, 1, 4, 1, 1, 3, 1 },
-#else
-	/* DMC L2: 133MHz */
-	{ 5, 2, 1, 5, 1, 1, 3, 1 },
-#endif
 };
 
 static unsigned int clkdiv_top[LV_END][5] = {
@@ -209,9 +187,6 @@ static unsigned int clkdiv_top[LV_END][5] = {
 
 	/* ACLK200 L1: 160MHz */
 	{ 4, 7, 5, 6, 1 },
-
-	/* ACLK200 L2: 133MHz */
-	{ 5, 7, 7, 7, 1 },
 };
 
 static unsigned int clkdiv_lr_bus[LV_END][2] = {
@@ -225,9 +200,6 @@ static unsigned int clkdiv_lr_bus[LV_END][2] = {
 
 	/* ACLK_GDL/R L2: 160MHz */
 	{ 4, 1 },
-
-	/* ACLK_GDL/R L3: 133MHz */
-	{ 5, 1 },
 };
 
 static unsigned int clkdiv_ip_bus[LV_END][3] = {
@@ -236,16 +208,11 @@ static unsigned int clkdiv_ip_bus[LV_END][3] = {
 	 * { DIV_MFC, DIV_G2D, DIV_FIMC }
 	 */
 
-	/* L0: MFC 200MHz G2D 266MHz FIMC 160MHz */
-	{ 3, 2, 4 },
+	/* L0: MFC 267MHz G2D 266MHz FIMC 160MHz */
+	{ 2, 2, 4 },
 
-	/* L1: MFC 200MHz G2D 160MHz FIMC 133MHz */
-	/* { 4, 4, 5 }, */
-	{ 3, 4, 5 },
-
-	/* L2: MFC 200MHz G2D 133MHz FIMC 100MHz */
-	/* { 5, 5, 7 }, */
-	{ 3, 5, 7 },
+	/* L1: MFC 160MHz G2D 160MHz FIMC 133MHz */
+	{ 4, 4, 5 },
 };
 
 #ifdef CONFIG_BUSFREQ_QOS
@@ -506,9 +473,6 @@ static unsigned int busfreq_monitor(void)
 		break;
 	case LV_1:
 		time_in_state[LV_1] += level_state_jiffies;
-		break;
-	case LV_2:
-		time_in_state[LV_2] += level_state_jiffies;
 		break;
 	default:
 		break;
