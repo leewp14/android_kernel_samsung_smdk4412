@@ -7510,7 +7510,7 @@ struct s5p_platform_tmu u1_tmu_data __initdata = {
 		.start_mem_throttle = 85,
 	},
 	.cpufreq = {
-		.limit_1st_throttle  = 1200000, /* 1400MHz in KHz order */
+		.limit_1st_throttle  = 1200000, /* 1200MHz in KHz order */
 		.limit_2nd_throttle  = 1000000, /* 1000MHz in KHz order */
 	},
 };
@@ -8061,7 +8061,7 @@ static void __init smdkc210_machine_init(void)
 #endif
 
 #if defined(CONFIG_VIDEO_MFC5X)
-	exynos4_mfc_setup_clock(&s5p_device_mfc.dev, 267 * MHZ);
+	exynos4_mfc_setup_clock(&s5p_device_mfc.dev, 160 * MHZ);
 #endif
 #if defined(CONFIG_VIDEO_SAMSUNG_S5P_MFC)
 	dev_set_name(&s5p_device_mfc.dev, "s3c-mfc");
