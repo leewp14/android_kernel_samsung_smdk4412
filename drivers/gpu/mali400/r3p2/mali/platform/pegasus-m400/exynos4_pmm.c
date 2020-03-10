@@ -102,8 +102,8 @@ mali_dvfs_table mali_dvfs[MALI_DVFS_STEPS]={
 			/* step 3 */{440  ,1000000	,1025000   ,85   , 90},
 			/* step 4 */{533  ,1000000	,1075000   ,95   ,100},
 #else
-			/* step 0 */{267  ,1000000	, 950000   , 0  , 85},
-                        /* step 1 */{400  ,1000000      ,1000000   ,75  ,100},
+			/* step 0 */{267  ,1000000	,1050000   , 0  , 70},
+                        /* step 1 */{400  ,1000000      ,1200000   ,85  ,100},
 #endif
 };
 
@@ -181,9 +181,9 @@ static unsigned int asv_3d_volt_4210_12_table[MALI_DVFS_STEPS][ASV_LEVEL_4210_12
 };
 
 static unsigned int asv_3d_volt_4210_14_table[MALI_DVFS_STEPS][ASV_LEVEL_4210_14] = {
-        {  1000000,  1000000,   950000,   950000,   950000},    /* L1(267Mhz) */
+        {  1100000,  1100000,  1000000,  1000000,   950000},    /* L1(267Mhz) */
 #if (MALI_DVFS_STEPS > 1)
-	{  1100000,  1100000,  1000000,  1000000,   950000},    /* L0(400Mhz) */
+	{  1200000,  1200000,  1100000,  1100000,  1050000},    /* L0(400Mhz) */
 #endif
 };
 #endif
@@ -220,7 +220,7 @@ int mali_gpu_vol = 1025000;
 /* Orion */
 static const mali_bool bis_vpll = MALI_FALSE;
 int mali_gpu_clk = 400;
-int mali_gpu_vol = 1000000;
+int mali_gpu_vol = 1200000;
 #endif
 
 static unsigned int GPU_MHZ	= 1000000;
