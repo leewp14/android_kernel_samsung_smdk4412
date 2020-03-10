@@ -208,11 +208,11 @@ static unsigned int clkdiv_ip_bus[LV_END][3] = {
 	 * { DIV_MFC, DIV_G2D, DIV_FIMC }
 	 */
 
-	/* L0: MFC 200MHz G2D 266MHz FIMC 160MHz */
-	{ 3, 2, 4 },
+	/* L0: MFC 160MHz G2D 266MHz FIMC 160MHz */
+	{ 4, 2, 4 },
 
-	/* L1: MFC 200MHz G2D 160MHz FIMC 133MHz */
-	{ 3, 4, 5 },
+	/* L1: MFC 160MHz G2D 160MHz FIMC 133MHz */
+	{ 4, 4, 5 },
 };
 
 #ifdef CONFIG_BUSFREQ_QOS
