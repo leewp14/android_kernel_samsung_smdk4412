@@ -6922,7 +6922,7 @@ static struct s3cfb_lcd s6e8aa0 = {
 	.p_height = 106,
 	.bpp = 24,
 
-	.freq = 59.94,
+	.freq = 48,
 
 	/* minumun value is 0 except for wr_act time. */
 	.cpu_timing = {
@@ -6982,11 +6982,11 @@ static int reset_lcd(void)
 	}
 
 	gpio_direction_output(EXYNOS4_GPY4(5), 1);
-	usleep_range(5000, 5000);
+	usleep_range(2000, 5000);
 	gpio_set_value(EXYNOS4_GPY4(5), 0);
-	usleep_range(5000, 5000);
+	usleep_range(2000, 5000);
 	gpio_set_value(EXYNOS4_GPY4(5), 1);
-	usleep_range(5000, 5000);
+	usleep_range(2000, 5000);
 
 	gpio_free(EXYNOS4_GPY4(5));
 
@@ -8061,7 +8061,7 @@ static void __init smdkc210_machine_init(void)
 #endif
 
 #if defined(CONFIG_VIDEO_MFC5X)
-	exynos4_mfc_setup_clock(&s5p_device_mfc.dev, 160 * MHZ);
+	exynos4_mfc_setup_clock(&s5p_device_mfc.dev, 200 * MHZ);
 #endif
 #if defined(CONFIG_VIDEO_SAMSUNG_S5P_MFC)
 	dev_set_name(&s5p_device_mfc.dev, "s3c-mfc");

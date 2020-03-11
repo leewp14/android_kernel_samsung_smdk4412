@@ -155,11 +155,11 @@ static unsigned int exynos4_qos_value[BUS_QOS_MAX][LV_END][4] = {
 
 #define ASV_GROUP	5
 static unsigned int exynos4_asv_volt[ASV_GROUP][LV_END] = {
-	{ 1150000, 1050000 },
-	{ 1125000, 1025000 },
 	{ 1100000, 1000000 },
-	{ 1075000,  975000 },
-	{ 1050000,  950000 },
+	{ 1100000, 1000000 },
+	{ 1000000,  950000 },
+	{ 1000000,  950000 },
+	{  950000,  950000 },
 };
 
 static unsigned int clkdiv_dmc0[LV_END][8] = {
@@ -208,11 +208,11 @@ static unsigned int clkdiv_ip_bus[LV_END][3] = {
 	 * { DIV_MFC, DIV_G2D, DIV_FIMC }
 	 */
 
-	/* L0: MFC 160MHz G2D 266MHz FIMC 160MHz */
-	{ 4, 2, 4 },
+	/* L0: MFC 200MHz G2D 266MHz FIMC 160MHz */
+	{ 3, 2, 4 },
 
-	/* L1: MFC 160MHz G2D 160MHz FIMC 133MHz */
-	{ 4, 4, 5 },
+	/* L1: MFC ***MHz G2D 160MHz FIMC 133MHz */
+	{ 7, 4, 5 },
 };
 
 #ifdef CONFIG_BUSFREQ_QOS
@@ -398,9 +398,6 @@ static int busfreq_target(struct busfreq_table *freq_table,
 			&& (ppc_load == 0))
 		idx = pre_idx;
 #endif
-
-	if ((idx > LV_1) && (ppmu_load > 5))
-		idx = LV_1;
 
 	if (idx > g_busfreq_lock_level)
 		idx = g_busfreq_lock_level;
