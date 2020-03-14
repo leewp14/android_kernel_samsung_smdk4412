@@ -1444,7 +1444,7 @@ static int s6e8ax0_probe(struct device *dev)
 	lcd->bl = DEFAULT_GAMMA_LEVEL;
 	lcd->current_bl = lcd->bl;
 
-	lcd->acl_enable = 0;
+	lcd->acl_enable = 1;
 	lcd->siop_enable = 0;
 	lcd->current_acl = 0;
 
