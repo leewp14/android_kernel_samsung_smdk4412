@@ -872,11 +872,6 @@ config MACH_Q1_BD
 
 endchoice
 
-config TARGET_LOCALE_NAATT_TEMP
-	bool "Support North America GSM ATT Board"
-	depends on MACH_U1
-	default n
-
 config MACH_PX
 	bool "PX board"
 	select CPU_EXYNOS4210
