@@ -1202,10 +1202,7 @@ static int __init exynos4_init_cpuidle(void)
 		device = &per_cpu(exynos4_cpuidle_device, cpu_id);
 		device->cpu = cpu_id;
 
-		if (cpu_id == 0)
 			device->state_count = ARRAY_SIZE(exynos4_cpuidle_set);
-		else
-			device->state_count = 1;	/* Support IDLE only */
 
 		max_cpuidle_state = device->state_count;
 
