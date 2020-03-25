@@ -56,6 +56,7 @@
 #include <linux/cma.h>
 #endif
 
+#include <asm/io.h>
 #include <asm/mach/arch.h>
 #include <asm/mach-types.h>
 
@@ -6191,6 +6192,18 @@ static void p6_wacom_register_callbacks(struct wacom_g5_callbacks *cb)
 #ifdef CONFIG_S3C_DEV_I2C8_EMUL
 static struct i2c_board_info i2c_devs8_emul[];
 #endif
+
+int check_bootmode(void)
+{
+        int inform2;
+
+        inform2 = __raw_readl(S5P_INFORM2);
+        if (inform2 == 0x1)
+                return 1;
+        else
+                return 0;
+}
+
 #if defined(CONFIG_KEYBOARD_CYPRESS_TOUCH) || defined(CONFIG_KEYBOARD_CYPRESS_TOUCH_BLN)
 static void touchkey_init_hw(void)
 {
