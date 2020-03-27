@@ -1,3 +1,4 @@
+
 /*
  *  drivers/cpufreq/cpufreq_pegasusq.c
  *
@@ -154,18 +155,18 @@ static unsigned int get_nr_run_avg(void)
 #define MIN_SAMPLING_RATE			(10000)
 #define MAX_HOTPLUG_RATE			(40u)
 
-#define DEF_MAX_CPU_LOCK			(2)
+#define DEF_MAX_CPU_LOCK			(0)
 #define DEF_MIN_CPU_LOCK			(0)
 #define DEF_CPU_UP_FREQ				(500000)
 #define DEF_CPU_DOWN_FREQ			(200000)
-#define DEF_UP_NR_CPUS				(2)
+#define DEF_UP_NR_CPUS				(1)
 #define DEF_CPU_UP_RATE				(10)
 #define DEF_CPU_DOWN_RATE			(20)
 #define DEF_FREQ_STEP				(37)
 #define DEF_START_DELAY				(0)
 
 #define DEF_UP_THRESHOLD_AT_MIN_FREQ		(40)
-#define DEF_FREQ_FOR_RESPONSIVENESS		(200000)
+#define DEF_FREQ_FOR_RESPONSIVENESS		(500000)
 
 #define HOTPLUG_DOWN_INDEX			(0)
 #define HOTPLUG_UP_INDEX			(1)
@@ -181,7 +182,7 @@ static int hotplug_freq[4][2] = {
 	{200000, 500000},
 	{200000, 0}
 };
-#elif CONFIG_MACH_U1
+#elif CONFIG_MACH_SMDK4210
 static int hotplug_rq[2][2] = {
 	{0, 100}, {100, 0}
 };
@@ -470,12 +471,10 @@ static inline cputime64_t get_cpu_idle_time_jiffy(unsigned int cpu,
 
 static inline cputime64_t get_cpu_idle_time(unsigned int cpu, cputime64_t *wall)
 {
-	u64 idle_time = get_cpu_idle_time_us(cpu, NULL);
+	u64 idle_time = get_cpu_idle_time_us(cpu, wall);
 
 	if (idle_time == -1ULL)
 		return get_cpu_idle_time_jiffy(cpu, wall);
-	else
-		idle_time += get_cpu_iowait_time_us(cpu, wall);
 
 	return idle_time;
 }
