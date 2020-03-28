@@ -90,7 +90,7 @@ typedef struct mali_runtime_resumeTag{
 #if defined(CONFIG_CPU_EXYNOS4212) || defined(CONFIG_CPU_EXYNOS4412)
 mali_runtime_resume_table mali_runtime_resume = {266,  900000, 1}; /* step 1 */
 #else
-mali_runtime_resume_table mali_runtime_resume = {267, 1000000, 0}; /* step 0 */
+mali_runtime_resume_table mali_runtime_resume = {266, 1000000, 0}; /* step 0 */
 #endif
 
 /* dvfs table */
@@ -102,7 +102,7 @@ mali_dvfs_table mali_dvfs[MALI_DVFS_STEPS]={
 			/* step 3 */{440  ,1000000	,1025000   ,85   , 90},
 			/* step 4 */{533  ,1000000	,1075000   ,95   ,100},
 #else
-			/* step 0 */{267  ,1000000	,1000000   , 0  , 50},
+			/* step 0 */{266  ,1000000	,1000000   , 0  , 50},
                         /* step 1 */{400  ,1000000      ,1100000   ,45  ,100},
 #endif
 };
@@ -181,7 +181,7 @@ static unsigned int asv_3d_volt_4210_12_table[MALI_DVFS_STEPS][ASV_LEVEL_4210_12
 };
 
 static unsigned int asv_3d_volt_4210_14_table[MALI_DVFS_STEPS][ASV_LEVEL_4210_14] = {
-        {  1050000,  1025000,  1000000,   975000,   950000},    /* L1(267Mhz) */
+        {  1050000,  1025000,  1000000,   975000,   950000},    /* L1(266Mhz) */
 #if (MALI_DVFS_STEPS > 1)
 	{  1150000,  1125000,  1100000,  1075000,  1050000},    /* L0(400Mhz) */
 #endif
@@ -219,7 +219,7 @@ int mali_gpu_vol = 1025000;
 #else
 /* Orion */
 static const mali_bool bis_vpll = MALI_FALSE;
-int mali_gpu_clk = 267;
+int mali_gpu_clk = 266;
 int mali_gpu_vol = 1000000;
 #endif
 
