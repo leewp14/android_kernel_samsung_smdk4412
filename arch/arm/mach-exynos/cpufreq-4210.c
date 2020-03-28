@@ -24,7 +24,7 @@
 
 #include <plat/clock.h>
 
-#define CPUFREQ_LEVEL_END	L7
+#define CPUFREQ_LEVEL_END	L6
 
 static int max_support_idx;
 static int min_support_idx = (CPUFREQ_LEVEL_END - 1);
@@ -41,13 +41,12 @@ struct cpufreq_clkdiv {
 static unsigned int exynos4210_volt_table[CPUFREQ_LEVEL_END];
 
 static struct cpufreq_frequency_table exynos4210_freq_table[] = {
-	{L0, 1600 * 1000},
-	{L1, 1400 * 1000},
-	{L2, 1200 * 1000},
-	{L3, 1000 * 1000},
-	{L4,  800 * 1000},
-	{L5,  500 * 1000},
-	{L6,  200 * 1000},
+	{L0, 1400 * 1000},
+	{L1, 1200 * 1000},
+	{L2, 1000 * 1000},
+	{L3,  800 * 1000},
+	{L4,  500 * 1000},
+	{L5,  200 * 1000},
 	{0, CPUFREQ_TABLE_END},
 };
 
@@ -58,7 +57,6 @@ static struct cpufreq_clkdiv exynos4210_clkdiv_table[] = {
 	{L3,  0},
 	{L4,  0},
 	{L5,  0},
-	{L6,  0},
 };
 
 static unsigned int clkdiv_cpu0[CPUFREQ_LEVEL_END][7] = {
@@ -67,36 +65,33 @@ static unsigned int clkdiv_cpu0[CPUFREQ_LEVEL_END][7] = {
 	 * { DIVCORE, DIVCOREM0, DIVCOREM1, DIVPERIPH,
 	 *		DIVATB, DIVPCLK_DBG, DIVAPLL }
 	 */
-	{ 0, 3, 7, 3, 4, 1, 7 },  /* ARM L0: 1600MHz */
-	{ 0, 3, 7, 3, 4, 1, 7 },  /* ARM L1: 1400MHz */
-	{ 0, 3, 7, 3, 4, 1, 7 },  /* ARM L2: 1200MHz */
-	{ 0, 3, 7, 3, 4, 1, 7 },  /* ARM L3: 1000MHz */
-	{ 0, 3, 7, 3, 3, 1, 7 },  /* ARM L4:  800MHz */
-	{ 0, 3, 7, 3, 3, 1, 7 },  /* ARM L5:  500MHz */
-	{ 0, 1, 3, 1, 3, 1, 0 },  /* ARM L6:  200MHz */
+	{ 0, 3, 7, 3, 4, 1, 7 },  /* ARM L0: 1400MHz */
+	{ 0, 3, 7, 3, 4, 1, 7 },  /* ARM L1: 1200MHz */
+	{ 0, 3, 7, 3, 4, 1, 7 },  /* ARM L2: 1000MHz */
+	{ 0, 3, 7, 3, 3, 1, 7 },  /* ARM L3:  800MHz */
+	{ 0, 3, 7, 3, 3, 1, 7 },  /* ARM L4:  500MHz */
+	{ 0, 1, 3, 1, 3, 1, 0 },  /* ARM L5:  200MHz */
 };
 
 static unsigned int clkdiv_cpu1[CPUFREQ_LEVEL_END][2] = {
 	/* Clock divider value for following
 	 * { DIVCOPY, DIVHPM }
 	 */
-	{ 6, 0 },       /* ARM L0: 1600MHz */
-	{ 5, 0 },	/* ARM L1: 1400MHz */
-	{ 5, 0 },	/* ARM L2: 1200MHz */
-	{ 4, 0 },	/* ARM L3: 1000MHz */
-	{ 3, 0 },	/* ARM L4:  800MHz */
-	{ 3, 0 },	/* ARM L5:  500MHz */
-	{ 3, 0 },	/* ARM L6:  200MHz */
+	{ 5, 0 },	/* ARM L0: 1400MHz */
+	{ 5, 0 },	/* ARM L1: 1200MHz */
+	{ 4, 0 },	/* ARM L2: 1000MHz */
+	{ 3, 0 },	/* ARM L3:  800MHz */
+	{ 3, 0 },	/* ARM L4:  500MHz */
+	{ 3, 0 },	/* ARM L5:  200MHz */
 };
 
 static unsigned int exynos4_apll_pms_table[CPUFREQ_LEVEL_END] = {
-	((200 << 16)|(3 << 8)|(0x1)),   /* APLL FOUT L0: 1600MHz */
-	((175 << 16)|(3 << 8)|(0x1)),	/* APLL FOUT L1: 1400MHz */
-	((150 << 16)|(3 << 8)|(0x1)),	/* APLL FOUT L2: 1200MHz */
-	((125 << 16)|(3 << 8)|(0x1)),	/* APLL FOUT L3: 1000MHz */
-	((100 << 16)|(3 << 8)|(0x1)),	/* APLL FOUT L4:  800MHz */
-	((250 << 16)|(6 << 8)|(0x2)),	/* APLL FOUT L5:  500MHz */
-	((150 << 16)|(6 << 8)|(0x3)),	/* APLL FOUT L6:  200MHz */
+	((350 << 16)|(6 << 8)|(0x1)),	/* APLL FOUT L0: 1400MHz */
+	((150 << 16)|(3 << 8)|(0x1)),	/* APLL FOUT L1: 1200MHz */
+	((250 << 16)|(6 << 8)|(0x1)),	/* APLL FOUT L2: 1000MHz */
+	((200 << 16)|(6 << 8)|(0x1)),	/* APLL FOUT L3:  800MHz */
+	((250 << 16)|(6 << 8)|(0x2)),	/* APLL FOUT L4:  500MHz */
+	((200 << 16)|(6 << 8)|(0x3)),	/* APLL FOUT L5:  200MHz */
 };
 
 /*
@@ -108,6 +103,7 @@ static const unsigned int asv_voltage_A[CPUFREQ_LEVEL_END][8] = {
 	 *	   SS, A1, A2, B1, B2, C1, C2, D
 	 * I9100 ASV_VOLTAGE_TABLE
 	 */
+	{ 0, 0, 0, 0, 0, 0, 0, 0 },
 	{ 1400000, 1400000, 1325000, 1325000, 1300000, 1275000, 1250000, 1225000 }, //1400MHz
 	{ 1350000, 1350000, 1275000, 1275000, 1250000, 1225000, 1200000, 1175000 }, //1200MHz
 	{ 1300000, 1250000, 1175000, 1175000, 1150000, 1125000, 1100000, 1075000 }, //1000MHz
@@ -121,7 +117,6 @@ static const unsigned int asv_voltage_B[CPUFREQ_LEVEL_END][5] = {
 	 *	   S, A, B, C, D
 	 * N7000 ASV_VOLTAGE_TABLE
 	 */
-	{ 1425000, 1425000, 1375000, 1325000, 1300000 }, //1600MHz
 	{ 1350000, 1350000, 1300000, 1250000, 1225000 }, //1400MHz
 	{ 1325000, 1275000, 1225000, 1175000, 1150000 }, //1200MHz
 	{ 1225000, 1175000, 1125000, 1075000, 1050000 }, //1000MHz
@@ -391,8 +386,8 @@ int exynos4210_cpufreq_init(struct exynos_dvfs_info *info)
 	}
 
 	info->mpll_freq_khz = rate;
-	info->pm_lock_idx = L4; /* PM safe freq should be 800Mhz on cpu wakeup */
-	info->pll_safe_idx = L3; /* Safe freq should be 1000Mhz */
+	info->pm_lock_idx = L3; /* PM safe freq should be 800Mhz on cpu wakeup */
+	info->pll_safe_idx = L2; /* Safe freq should be 1000Mhz */
 	info->max_support_idx = max_support_idx;
 	info->min_support_idx = min_support_idx;
 	info->cpu_clk = cpu_clk;
