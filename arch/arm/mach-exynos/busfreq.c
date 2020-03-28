@@ -102,7 +102,7 @@ struct busfreq_table {
 
 static struct busfreq_table exynos4_busfreq_table[] = {
 	{LV_0, 400000, 1100000, 0, 0},
-	{LV_1, 267000, 1000000, 0, 0},
+	{LV_1, 266000, 1000000, 0, 0},
 	{0, 0, 0, 0, 0},
 };
 
