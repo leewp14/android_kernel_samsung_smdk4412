@@ -1764,7 +1764,7 @@ static struct fimg2d_platdata fimg2d_data __initdata = {
 	.parent_clkname = "mout_g2d0",
 	.clkname = "sclk_fimg2d",
 	.gate_clkname = "fimg2d",
-	.clkrate = 267 * 1000000,	/* 267 Mhz */
+	.clkrate = 266 * 1000000,	/* 266 Mhz */
 };
 #endif
 
