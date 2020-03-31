@@ -633,17 +633,6 @@ static int exynos_cpufreq_notifier_event(struct notifier_block *this,
 #endif
 		exynos_cpufreq_disable = true;
 
-#ifdef CONFIG_SLP
-		/*
-		 * Safe Voltage for Suspend/Wakeup: Falling back to the
-		 * default value of bootloaders.
-		 * Note that at suspended state, this 'high' voltage does
-		 * not incur higher power consumption because it is OFF.
-		 * This is for the stability during suspend/wakeup process.
-		 */
-		regulator_set_voltage(arm_regulator, 120000, 120000 + 25000);
-#endif
-
 		pr_debug("PM_SUSPEND_PREPARE for CPUFREQ\n");
 		return NOTIFY_OK;
 	case PM_POST_RESTORE:
