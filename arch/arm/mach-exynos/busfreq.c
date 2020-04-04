@@ -103,13 +103,13 @@ struct busfreq_table {
 
 static struct busfreq_table exynos4_busfreq_table[] = {
 	{LV_0, 400000, 1100000, 0, 0},
-	{LV_1, 267000, 1000000, 0, 0},
+	{LV_1, 266000, 1000000, 0, 0},
 #ifdef CONFIG_BUSFREQ_L2_160M
 	/*L2: 160MHz */
-	{LV_2, 160000, 1000000, 0, 0},
+	{LV_2, 160000,  950000, 0, 0},
 #else
 	/* L2: 133MHz */
-	{LV_2, 133000, 950000, 0, 0},
+	{LV_2, 133000,  950000, 0, 0},
 #endif
 	{0, 0, 0, 0, 0},
 };
@@ -169,11 +169,11 @@ static unsigned int exynos4_qos_value[BUS_QOS_MAX][LV_END][4] = {
 
 #define ASV_GROUP	5
 static unsigned int exynos4_asv_volt[ASV_GROUP][LV_END] = {
-	{1150000, 1050000, 1050000},
-	{1125000, 1025000, 1025000},
-	{1100000, 1000000, 1000000},
-	{1075000, 975000, 975000},
-	{1050000, 950000, 950000},
+	{ 1150000, 1050000, 1000000 },
+	{ 1125000, 1025000,  975000 },
+	{ 1100000, 1000000,  950000 },
+	{ 1075000,  975000,  950000 },
+	{ 1050000,  950000,  950000 },
 };
 
 static unsigned int clkdiv_dmc0[LV_END][8] = {
@@ -239,13 +239,11 @@ static unsigned int clkdiv_ip_bus[LV_END][3] = {
 	/* L0: MFC 200MHz G2D 266MHz FIMC 160MHz */
 	{ 3, 2, 4 },
 
-	/* L1: MFC 200MHz G2D 160MHz FIMC 133MHz */
-	/* { 4, 4, 5 }, */
-	{ 3, 4, 5 },
+	/* L1: MFC 160MHz G2D 160MHz FIMC 133MHz */
+	{ 4, 4, 5 },
 
-	/* L2: MFC 200MHz G2D 133MHz FIMC 100MHz */
-	/* { 5, 5, 7 }, */
-	{ 3, 5, 7 },
+	/* L2: MFC 133MHz G2D 133MHz FIMC 100MHz */
+	{ 5, 5, 7 },
 };
 
 #ifdef CONFIG_BUSFREQ_QOS
@@ -379,8 +377,8 @@ static int busfreq_target(struct busfreq_table *freq_table,
 		return -EINVAL;
 
 	if (ppc_load > 50) {
-		pr_debug("Busfreq: Bus Load is larger than 40(%d)\n", ppc_load);
-		ppc_load = 50;
+		pr_debug("Busfreq: Bus Load is larger than 50(%d)\n", ppc_load);
+		//ppc_load = 40;
 	}
 
 #ifdef CONFIG_BUSFREQ_L2_160M
@@ -627,6 +625,8 @@ int exynos4_busfreq_lock(unsigned int nId,
 	}
 
 	mutex_lock(&set_bus_freq_lock);
+
+#if 0
 	if (g_busfreq_lock_id & (1 << nId)) {
 		pr_err("This device [%d] already locked busfreq\n", nId);
 		ret = -EINVAL;
@@ -648,6 +648,7 @@ int exynos4_busfreq_lock(unsigned int nId,
 		exynos4_set_busfreq(busfreq_level);
 	}
 err:
+#endif
 	mutex_unlock(&set_bus_freq_lock);
 
 	return ret;
@@ -663,6 +664,8 @@ void exynos4_busfreq_lock_free(unsigned int nId)
 	}
 
 	mutex_lock(&set_bus_freq_lock);
+
+#if 0
 	g_busfreq_lock_id &= ~(1 << nId);
 	g_busfreq_lock_val[nId] = BUS_LEVEL_END - 1;
 	g_busfreq_lock_level = BUS_LEVEL_END - 1;
@@ -673,6 +676,7 @@ void exynos4_busfreq_lock_free(unsigned int nId)
 				g_busfreq_lock_level = g_busfreq_lock_val[i];
 		}
 	}
+#endif
 	mutex_unlock(&set_bus_freq_lock);
 }
 
