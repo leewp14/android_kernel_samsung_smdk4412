@@ -155,10 +155,4 @@
 # define PR_CAP_AMBIENT_LOWER		3
 # define PR_CAP_AMBIENT_CLEAR_ALL	4
 
-/*
- * Get effective timerslack value for the process.
- * It can be higher than PR_GET_TIMERSLACK.
- */
-#define PR_GET_EFFECTIVE_TIMERSLACK 35
-
 #endif /* _LINUX_PRCTL_H */
