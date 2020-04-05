@@ -65,19 +65,19 @@ static unsigned int clkdiv_cpu0[CPUFREQ_LEVEL_END][7] = {
 	 * { DIVCORE, DIVCOREM0, DIVCOREM1, DIVPERIPH,
 	 *		DIVATB, DIVPCLK_DBG, DIVAPLL }
 	 */
-	{ 0, 3, 7, 3, 4, 1, 7 },  /* ARM L0: 1400MHz */
-	{ 0, 3, 7, 3, 4, 1, 7 },  /* ARM L1: 1200MHz */
-	{ 0, 3, 7, 3, 4, 1, 7 },  /* ARM L2: 1000MHz */
-	{ 0, 3, 7, 3, 3, 1, 7 },  /* ARM L3:  800MHz */
-	{ 0, 3, 7, 3, 3, 1, 7 },  /* ARM L4:  500MHz */
-	{ 0, 1, 3, 1, 3, 1, 0 },  /* ARM L5:  200MHz */
+	{ 0, 3, 7, 3, 6, 6, 7 },  /* ARM L0: 1400MHz */
+	{ 0, 3, 7, 3, 5, 5, 7 },  /* ARM L1: 1200MHz */
+	{ 0, 2, 7, 2, 4, 4, 7 },  /* ARM L2: 1000MHz */
+	{ 0, 2, 7, 2, 3, 3, 7 },  /* ARM L3:  800MHz */
+	{ 0, 2, 7, 2, 3, 2, 7 },  /* ARM L4:  500MHz */
+	{ 0, 1, 3, 1, 1, 1, 0 },  /* ARM L5:  200MHz */
 };
 
 static unsigned int clkdiv_cpu1[CPUFREQ_LEVEL_END][2] = {
 	/* Clock divider value for following
 	 * { DIVCOPY, DIVHPM }
 	 */
-	{ 5, 0 },	/* ARM L0: 1400MHz */
+	{ 6, 0 },	/* ARM L0: 1400MHz */
 	{ 5, 0 },	/* ARM L1: 1200MHz */
 	{ 4, 0 },	/* ARM L2: 1000MHz */
 	{ 3, 0 },	/* ARM L3:  800MHz */
@@ -86,12 +86,12 @@ static unsigned int clkdiv_cpu1[CPUFREQ_LEVEL_END][2] = {
 };
 
 static unsigned int exynos4_apll_pms_table[CPUFREQ_LEVEL_END] = {
-	((350 << 16)|(6 << 8)|(0x1)),	/* APLL FOUT L0: 1400MHz */
+	((175 << 16)|(3 << 8)|(0x1)),	/* APLL FOUT L0: 1400MHz */
 	((150 << 16)|(3 << 8)|(0x1)),	/* APLL FOUT L1: 1200MHz */
-	((250 << 16)|(6 << 8)|(0x1)),	/* APLL FOUT L2: 1000MHz */
-	((200 << 16)|(6 << 8)|(0x1)),	/* APLL FOUT L3:  800MHz */
-	((250 << 16)|(6 << 8)|(0x2)),	/* APLL FOUT L4:  500MHz */
-	((200 << 16)|(6 << 8)|(0x3)),	/* APLL FOUT L5:  200MHz */
+	((125 << 16)|(3 << 8)|(0x1)),	/* APLL FOUT L2: 1000MHz */
+	((100 << 16)|(3 << 8)|(0x1)),	/* APLL FOUT L3:  800MHz */
+	((125 << 16)|(3 << 8)|(0x2)),	/* APLL FOUT L4:  500MHz */
+	((100 << 16)|(3 << 8)|(0x3)),	/* APLL FOUT L5:  200MHz */
 };
 
 /*
