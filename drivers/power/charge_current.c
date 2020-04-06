@@ -21,8 +21,8 @@ int charge_current_usb = 450;
 
 
 static ssize_t charge_current_show(struct device *dev, struct device_attribute *attr, char *buf) {
-	return sprintf(buf, "AC: %d\nMisc: %d\nUSB: %d\n",
-		charge_current_ac, charge_current_misc, charge_current_usb);
+	return sprintf(buf, "AC: %d/%d\nMisc: %d/%d\nUSB: %d/%d\n",
+		charge_current_ac, MAX_CURRENT_AC, charge_current_misc, MAX_CURRENT_MISC, charge_current_usb, MAX_CURRENT_USB);
 }
 
 static ssize_t charge_current_store(struct device *dev, struct device_attribute *attr, const char *buf,
