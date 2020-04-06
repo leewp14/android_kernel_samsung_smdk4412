@@ -626,7 +626,6 @@ int exynos4_busfreq_lock(unsigned int nId,
 
 	mutex_lock(&set_bus_freq_lock);
 
-#if 0
 	if (g_busfreq_lock_id & (1 << nId)) {
 		pr_err("This device [%d] already locked busfreq\n", nId);
 		ret = -EINVAL;
@@ -648,7 +647,6 @@ int exynos4_busfreq_lock(unsigned int nId,
 		exynos4_set_busfreq(busfreq_level);
 	}
 err:
-#endif
 	mutex_unlock(&set_bus_freq_lock);
 
 	return ret;
@@ -665,7 +663,6 @@ void exynos4_busfreq_lock_free(unsigned int nId)
 
 	mutex_lock(&set_bus_freq_lock);
 
-#if 0
 	g_busfreq_lock_id &= ~(1 << nId);
 	g_busfreq_lock_val[nId] = BUS_LEVEL_END - 1;
 	g_busfreq_lock_level = BUS_LEVEL_END - 1;
@@ -676,7 +673,6 @@ void exynos4_busfreq_lock_free(unsigned int nId)
 				g_busfreq_lock_level = g_busfreq_lock_val[i];
 		}
 	}
-#endif
 	mutex_unlock(&set_bus_freq_lock);
 }
 
