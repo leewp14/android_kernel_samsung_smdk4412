@@ -15,9 +15,9 @@
 #define MAX_CURRENT_AC   1000
 #define MAX_CURRENT_MISC 1000
 #define MAX_CURRENT_USB  1000
-int charge_current_ac = 650;
-int charge_current_misc = 450;
-int charge_current_usb = 450;
+int charge_current_ac = 680;
+int charge_current_misc = 480;
+int charge_current_usb = 480;
 
 
 static ssize_t charge_current_show(struct device *dev, struct device_attribute *attr, char *buf) {
