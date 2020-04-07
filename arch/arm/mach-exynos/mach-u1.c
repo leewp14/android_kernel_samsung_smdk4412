@@ -6995,11 +6995,11 @@ static int reset_lcd(void)
 	}
 
 	gpio_direction_output(EXYNOS4_GPY4(5), 1);
-	//usleep_range(5000, 5000);
+	usleep_range(5000, 5000);
 	gpio_set_value(EXYNOS4_GPY4(5), 0);
-	//usleep_range(5000, 5000);
+	usleep_range(5000, 5000);
 	gpio_set_value(EXYNOS4_GPY4(5), 1);
-	//usleep_range(5000, 5000);
+	usleep_range(5000, 5000);
 
 	gpio_free(EXYNOS4_GPY4(5));
 
