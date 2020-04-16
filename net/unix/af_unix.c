@@ -115,10 +115,8 @@
 #include <net/checksum.h>
 #include <linux/security.h>
 
-struct hlist_head unix_socket_table[UNIX_HASH_SIZE + 1];
-EXPORT_SYMBOL_GPL(unix_socket_table);
-DEFINE_SPINLOCK(unix_table_lock);
-EXPORT_SYMBOL_GPL(unix_table_lock);
+static struct hlist_head unix_socket_table[UNIX_HASH_SIZE + 1];
+static DEFINE_SPINLOCK(unix_table_lock);
 static atomic_long_t unix_nr_socks;
 
 #define unix_sockets_unbound	(&unix_socket_table[UNIX_HASH_SIZE])
@@ -174,7 +172,7 @@ static inline int unix_recvq_full(struct sock const *sk)
 	return skb_queue_len(&sk->sk_receive_queue) > sk->sk_max_ack_backlog;
 }
 
-struct sock *unix_peer_get(struct sock *s)
+static struct sock *unix_peer_get(struct sock *s)
 {
 	struct sock *peer;
 
@@ -185,7 +183,6 @@ struct sock *unix_peer_get(struct sock *s)
 	unix_state_unlock(s);
 	return peer;
 }
-EXPORT_SYMBOL_GPL(unix_peer_get);
 
 static inline void unix_release_addr(struct unix_address *addr)
 {

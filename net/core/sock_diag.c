@@ -74,7 +74,7 @@ int sock_diag_register(struct sock_diag_handler *hndl)
 {
 	int err = 0;
 
-	if (hndl->family > AF_MAX)
+	if (hndl->family >= AF_MAX)
 		return -EINVAL;
 
 	mutex_lock(&sock_diag_table_mutex);
@@ -92,7 +92,7 @@ void sock_diag_unregister(struct sock_diag_handler *hnld)
 {
 	int family = hnld->family;
 
-	if (family > AF_MAX)
+	if (family >= AF_MAX)
 		return;
 
 	mutex_lock(&sock_diag_table_mutex);
@@ -124,6 +124,9 @@ static int __sock_diag_cmd(struct sk_buff *skb, struct nlmsghdr *nlh)
 	struct sock_diag_handler *hndl;
 
 	if (nlmsg_len(nlh) < sizeof(*req))
+		return -EINVAL;
+
+	if (req->sdiag_family >= AF_MAX)
 		return -EINVAL;
 
 	hndl = sock_diag_lock_handler(req->sdiag_family);
