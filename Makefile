@@ -563,7 +563,23 @@ all: vmlinux
 ifdef CONFIG_CC_OPTIMIZE_FOR_SIZE
 KBUILD_CFLAGS	+= -Os
 else
+ifdef CONFIG_CC_OPTIMIZE_CUSTOM
+KBUILD_CFLAGS += -Ofast \
+		 -march=armv7-a+simd \
+		 -mtune=cortex-a9 \
+		 -mfpu=neon \
+		 -mfloat-abi=softfp \
+		 -funsafe-math-optimizations \
+		 -frename-registers \
+		 -funroll-loops \
+		 -fopenmp \
+		 -D_GLIBCXX_PARALLEL \
+		 --param l1-cache-line-size=32 \
+		 --param l1-cache-size=32 \
+		 --param l2-cache-size=1024
+else
 KBUILD_CFLAGS	+= -O2
+endif
 endif
 
 ifdef CONFIG_CC_CHECK_WARNING_STRICTLY
