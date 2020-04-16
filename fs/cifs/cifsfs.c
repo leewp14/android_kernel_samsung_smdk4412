@@ -133,12 +133,10 @@ cifs_read_super(struct super_block *sb)
 
 	if (IS_ERR(inode)) {
 		rc = PTR_ERR(inode);
-		inode = NULL;
 		goto out_no_root;
 	}
 
-	sb->s_root = d_alloc_root(inode);
-
+	sb->s_root = d_make_root(inode);
 	if (!sb->s_root) {
 		rc = -ENOMEM;
 		goto out_no_root;
@@ -161,9 +159,6 @@ cifs_read_super(struct super_block *sb)
 
 out_no_root:
 	cERROR(1, "cifs_read_super: get root inode failed");
-	if (inode)
-		iput(inode);
-
 	return rc;
 }
 
@@ -224,7 +219,7 @@ cifs_statfs(struct dentry *dentry, struct kstatfs *buf)
 	return 0;
 }
 
-static int cifs_permission(struct inode *inode, int mask, unsigned int flags)
+static int cifs_permission(struct inode *inode, int mask)
 {
 	struct cifs_sb_info *cifs_sb;
 
@@ -239,7 +234,7 @@ static int cifs_permission(struct inode *inode, int mask, unsigned int flags)
 		on the client (above and beyond ACL on servers) for
 		servers which do not support setting and viewing mode bits,
 		so allowing client to check permissions is useful */
-		return generic_permission(inode, mask, flags, NULL);
+		return generic_permission(inode, mask);
 }
 
 static struct kmem_cache *cifs_inode_cachep;
@@ -357,9 +352,9 @@ cifs_show_security(struct seq_file *s, struct TCP_Server_Info *server)
  * ones are.
  */
 static int
-cifs_show_options(struct seq_file *s, struct vfsmount *m)
+cifs_show_options(struct seq_file *s, struct dentry *root)
 {
-	struct cifs_sb_info *cifs_sb = CIFS_SB(m->mnt_sb);
+	struct cifs_sb_info *cifs_sb = CIFS_SB(root->d_sb);
 	struct cifs_tcon *tcon = cifs_sb_master_tcon(cifs_sb);
 	struct sockaddr *srcaddr;
 	srcaddr = (struct sockaddr *)&tcon->ses->server->srcaddr;
@@ -444,7 +439,7 @@ cifs_show_options(struct seq_file *s, struct vfsmount *m)
 		seq_printf(s, ",cifsacl");
 	if (cifs_sb->mnt_cifs_flags & CIFS_MOUNT_DYNPERM)
 		seq_printf(s, ",dynperm");
-	if (m->mnt_sb->s_flags & MS_POSIXACL)
+	if (root->d_sb->s_flags & MS_POSIXACL)
 		seq_printf(s, ",acl");
 	if (cifs_sb->mnt_cifs_flags & CIFS_MOUNT_MF_SYMLINKS)
 		seq_printf(s, ",mfsymlinks");
@@ -496,7 +491,7 @@ static void cifs_umount_begin(struct super_block *sb)
 }
 
 #ifdef CONFIG_CIFS_STATS2
-static int cifs_show_stats(struct seq_file *s, struct vfsmount *mnt)
+static int cifs_show_stats(struct seq_file *s, struct dentry *root)
 {
 	/* BB FIXME */
 	return 0;

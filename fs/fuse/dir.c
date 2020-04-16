@@ -222,6 +222,50 @@ static int fuse_dentry_revalidate(struct dentry *entry, struct nameidata *nd)
 	return 1;
 }
 
+/*
+ * Get the canonical path. Since we must translate to a path, this must be done
+ * in the context of the userspace daemon, however, the userspace daemon cannot
+ * look up paths on its own. Instead, we handle the lookup as a special case
+ * inside of the write request.
+ */
+static void fuse_dentry_canonical_path(const struct path *path, struct path *canonical_path) {
+	struct inode *inode = path->dentry->d_inode;
+	struct fuse_conn *fc = get_fuse_conn(inode);
+	struct fuse_req *req;
+	int err;
+	char *path_name;
+
+	req = fuse_get_req(fc);
+	err = PTR_ERR(req);
+	if (IS_ERR(req))
+		goto default_path;
+
+	path_name = (char*)__get_free_page(GFP_KERNEL);
+	if (!path_name) {
+		fuse_put_request(fc, req);
+		goto default_path;
+	}
+
+	req->in.h.opcode = FUSE_CANONICAL_PATH;
+	req->in.h.nodeid = get_node_id(inode);
+	req->in.numargs = 0;
+	req->out.numargs = 1;
+	req->out.args[0].size = PATH_MAX;
+	req->out.args[0].value = path_name;
+	req->canonical_path = canonical_path;
+	req->out.argvar = 1;
+	fuse_request_send(fc, req);
+	err = req->out.h.error;
+	fuse_put_request(fc, req);
+	free_page((unsigned long)path_name);
+	if (!err)
+		return;
+default_path:
+	canonical_path->dentry = path->dentry;
+	canonical_path->mnt = path->mnt;
+	path_get(canonical_path);
+}
+
 static int invalid_nodeid(u64 nodeid)
 {
 	return !nodeid || nodeid == FUSE_ROOT_ID;
@@ -229,6 +273,7 @@ static int invalid_nodeid(u64 nodeid)
 
 const struct dentry_operations fuse_dentry_operations = {
 	.d_revalidate	= fuse_dentry_revalidate,
+	.d_canonical_path = fuse_dentry_canonical_path,
 };
 
 int fuse_valid_type(int m)
@@ -547,7 +592,7 @@ static int create_new_entry(struct fuse_conn *fc, struct fuse_req *req,
 	return err;
 }
 
-static int fuse_mknod(struct inode *dir, struct dentry *entry, int mode,
+static int fuse_mknod(struct inode *dir, struct dentry *entry, umode_t mode,
 		      dev_t rdev)
 {
 	struct fuse_mknod_in inarg;
@@ -573,7 +618,7 @@ static int fuse_mknod(struct inode *dir, struct dentry *entry, int mode,
 	return create_new_entry(fc, req, dir, entry, mode);
 }
 
-static int fuse_create(struct inode *dir, struct dentry *entry, int mode,
+static int fuse_create(struct inode *dir, struct dentry *entry, umode_t mode,
 		       struct nameidata *nd)
 {
 	if (nd && (nd->flags & LOOKUP_OPEN)) {
@@ -585,7 +630,7 @@ static int fuse_create(struct inode *dir, struct dentry *entry, int mode,
 	return fuse_mknod(dir, entry, mode, 0);
 }
 
-static int fuse_mkdir(struct inode *dir, struct dentry *entry, int mode)
+static int fuse_mkdir(struct inode *dir, struct dentry *entry, umode_t mode)
 {
 	struct fuse_mkdir_in inarg;
 	struct fuse_conn *fc = get_fuse_conn(dir);
@@ -972,9 +1017,9 @@ static int fuse_access(struct inode *inode, int mask)
 	return err;
 }
 
-static int fuse_perm_getattr(struct inode *inode, int flags)
+static int fuse_perm_getattr(struct inode *inode, int mask)
 {
-	if (flags & IPERM_FLAG_RCU)
+	if (mask & MAY_NOT_BLOCK)
 		return -ECHILD;
 
 	return fuse_do_getattr(inode, NULL, NULL);
@@ -993,7 +1038,7 @@ static int fuse_perm_getattr(struct inode *inode, int flags)
  * access request is sent.  Execute permission is still checked
  * locally based on file mode.
  */
-static int fuse_permission(struct inode *inode, int mask, unsigned int flags)
+static int fuse_permission(struct inode *inode, int mask)
 {
 	struct fuse_conn *fc = get_fuse_conn(inode);
 	bool refreshed = false;
@@ -1012,23 +1057,22 @@ static int fuse_permission(struct inode *inode, int mask, unsigned int flags)
 		if (fi->i_time < get_jiffies_64()) {
 			refreshed = true;
 
-			err = fuse_perm_getattr(inode, flags);
+			err = fuse_perm_getattr(inode, mask);
 			if (err)
 				return err;
 		}
 	}
 
 	if (fc->flags & FUSE_DEFAULT_PERMISSIONS) {
-		err = generic_permission(inode, mask, flags, NULL);
+		err = generic_permission(inode, mask);
 
 		/* If permission is denied, try to refresh file
 		   attributes.  This is also needed, because the root
 		   node will at first have no permissions */
 		if (err == -EACCES && !refreshed) {
-			err = fuse_perm_getattr(inode, flags);
+			err = fuse_perm_getattr(inode, mask);
 			if (!err)
-				err = generic_permission(inode, mask,
-							flags, NULL);
+				err = generic_permission(inode, mask);
 		}
 
 		/* Note: the opposite of the above test does not
@@ -1036,7 +1080,7 @@ static int fuse_permission(struct inode *inode, int mask, unsigned int flags)
 		   noticed immediately, only after the attribute
 		   timeout has expired */
 	} else if (mask & (MAY_ACCESS | MAY_CHDIR)) {
-		if (flags & IPERM_FLAG_RCU)
+		if (mask & MAY_NOT_BLOCK)
 			return -ECHILD;
 
 		err = fuse_access(inode, mask);
@@ -1045,7 +1089,7 @@ static int fuse_permission(struct inode *inode, int mask, unsigned int flags)
 			if (refreshed)
 				return -EACCES;
 
-			err = fuse_perm_getattr(inode, flags);
+			err = fuse_perm_getattr(inode, mask);
 			if (!err && !(inode->i_mode & S_IXUGO))
 				return -EACCES;
 		}
@@ -1178,9 +1222,10 @@ static int fuse_dir_release(struct inode *inode, struct file *file)
 	return 0;
 }
 
-static int fuse_dir_fsync(struct file *file, int datasync)
+static int fuse_dir_fsync(struct file *file, loff_t start, loff_t end,
+			  int datasync)
 {
-	return fuse_fsync_common(file, datasync, 1);
+	return fuse_fsync_common(file, start, end, datasync, 1);
 }
 
 static bool update_mtime(unsigned ivalid)

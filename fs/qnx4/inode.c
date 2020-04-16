@@ -269,19 +269,19 @@ static int qnx4_fill_super(struct super_block *s, void *data, int silent)
 	if (IS_ERR(root)) {
 		printk(KERN_ERR "qnx4: get inode failed\n");
 		ret = PTR_ERR(root);
- 		goto out;
+ 		goto outb;
  	}
 
 	ret = -ENOMEM;
- 	s->s_root = d_alloc_root(root);
+ 	s->s_root = d_make_root(root);
  	if (s->s_root == NULL)
- 		goto outi;
+ 		goto outb;
 
 	brelse(bh);
 	return 0;
 
-      outi:
-	iput(root);
+      outb:
+	kfree(qs->BitMap);
       out:
 	brelse(bh);
       outnobh:
@@ -379,7 +379,7 @@ struct inode *qnx4_iget(struct super_block *sb, unsigned long ino)
 	inode->i_mode    = le16_to_cpu(raw_inode->di_mode);
 	inode->i_uid     = (uid_t)le16_to_cpu(raw_inode->di_uid);
 	inode->i_gid     = (gid_t)le16_to_cpu(raw_inode->di_gid);
-	inode->i_nlink   = le16_to_cpu(raw_inode->di_nlink);
+	set_nlink(inode, le16_to_cpu(raw_inode->di_nlink));
 	inode->i_size    = le32_to_cpu(raw_inode->di_size);
 	inode->i_mtime.tv_sec   = le32_to_cpu(raw_inode->di_mtime);
 	inode->i_mtime.tv_nsec = 0;
@@ -427,7 +427,6 @@ static struct inode *qnx4_alloc_inode(struct super_block *sb)
 static void qnx4_i_callback(struct rcu_head *head)
 {
 	struct inode *inode = container_of(head, struct inode, i_rcu);
-	INIT_LIST_HEAD(&inode->i_dentry);
 	kmem_cache_free(qnx4_inode_cachep, qnx4_i(inode));
 }
 
@@ -473,6 +472,7 @@ static struct file_system_type qnx4_fs_type = {
 	.kill_sb	= kill_block_super,
 	.fs_flags	= FS_REQUIRES_DEV,
 };
+MODULE_ALIAS_FS("qnx4");
 
 static int __init init_qnx4_fs(void)
 {

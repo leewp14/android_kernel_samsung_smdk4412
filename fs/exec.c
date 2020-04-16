@@ -1113,6 +1113,13 @@ out:
 }
 EXPORT_SYMBOL(flush_old_exec);
 
+void would_dump(struct linux_binprm *bprm, struct file *file)
+{
+	if (inode_permission2(file->f_path.mnt, file->f_path.dentry->d_inode, MAY_READ) < 0)
+		bprm->interp_flags |= BINPRM_FLAGS_ENFORCE_NONDUMP;
+}
+EXPORT_SYMBOL(would_dump);
+
 void setup_new_exec(struct linux_binprm * bprm)
 {
 	int i, ch;
@@ -1152,9 +1159,10 @@ void setup_new_exec(struct linux_binprm * bprm)
 	if (bprm->cred->uid != current_euid() ||
 	    bprm->cred->gid != current_egid()) {
 		current->pdeath_signal = 0;
-	} else if (file_permission(bprm->file, MAY_READ) ||
-		   bprm->interp_flags & BINPRM_FLAGS_ENFORCE_NONDUMP) {
-		set_dumpable(current->mm, suid_dumpable);
+	} else {
+		would_dump(bprm, bprm->file);
+		if (bprm->interp_flags & BINPRM_FLAGS_ENFORCE_NONDUMP)
+			set_dumpable(current->mm, suid_dumpable);
 	}
 
 	/* An exec changes our domain. We are no longer part of the thread
@@ -1244,7 +1252,7 @@ EXPORT_SYMBOL(install_exec_creds);
  * - the caller must hold ->cred_guard_mutex to protect against
  *   PTRACE_ATTACH or seccomp thread-sync
  */
-int check_unsafe_exec(struct linux_binprm *bprm)
+static int check_unsafe_exec(struct linux_binprm *bprm)
 {
 	struct task_struct *p = current, *t;
 	unsigned n_fs;
@@ -1371,13 +1379,13 @@ int remove_arg_zero(struct linux_binprm *bprm)
 			ret = -EFAULT;
 			goto out;
 		}
-		kaddr = kmap_atomic(page, KM_USER0);
+		kaddr = kmap_atomic(page);
 
 		for (; offset < PAGE_SIZE && kaddr[offset];
 				offset++, bprm->p++)
 			;
 
-		kunmap_atomic(kaddr, KM_USER0);
+		kunmap_atomic(kaddr);
 		put_arg_page(page);
 
 		if (offset == PAGE_SIZE)

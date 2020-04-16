@@ -91,10 +91,9 @@ static int configfs_fill_super(struct super_block *sb, void *data, int silent)
 		return -ENOMEM;
 	}
 
-	root = d_alloc_root(inode);
+	root = d_make_root(inode);
 	if (!root) {
 		pr_debug("%s: could not get root dentry!\n",__func__);
-		iput(inode);
 		return -ENOMEM;
 	}
 	config_group_init(&configfs_root_group);
@@ -117,6 +116,7 @@ static struct file_system_type configfs_fs_type = {
 	.mount		= configfs_do_mount,
 	.kill_sb	= kill_litter_super,
 };
+MODULE_ALIAS_FS("configfs");
 
 int configfs_pin_fs(void)
 {

@@ -8,15 +8,6 @@
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
 
@@ -2044,7 +2035,6 @@ static int
 gadgetfs_fill_super (struct super_block *sb, void *opts, int silent)
 {
 	struct inode	*inode;
-	struct dentry	*d;
 	struct dev_data	*dev;
 
 	if (the_device)
@@ -2067,24 +2057,25 @@ gadgetfs_fill_super (struct super_block *sb, void *opts, int silent)
 			NULL, &simple_dir_operations,
 			S_IFDIR | S_IRUGO | S_IXUGO);
 	if (!inode)
-		goto enomem0;
+		goto Enomem;
 	inode->i_op = &simple_dir_inode_operations;
-	if (!(d = d_alloc_root (inode)))
-		goto enomem1;
-	sb->s_root = d;
+	if (!(sb->s_root = d_make_root (inode)))
+		goto Enomem;
 
 	/* the ep0 file is named after the controller we expect;
 	 * user mode code can use it for sanity checks, like we do.
 	 */
 	dev = dev_new ();
 	if (!dev)
-		goto enomem2;
+		goto Enomem;
 
 	dev->sb = sb;
 	if (!gadgetfs_create_file (sb, CHIP,
 				dev, &dev_init_operations,
-				&dev->dentry))
-		goto enomem3;
+				&dev->dentry)) {
+		put_dev(dev);
+		goto Enomem;
+	}
 
 	/* other endpoint files are available after hardware setup,
 	 * from binding to a controller.
@@ -2092,13 +2083,7 @@ gadgetfs_fill_super (struct super_block *sb, void *opts, int silent)
 	the_device = dev;
 	return 0;
 
-enomem3:
-	put_dev (dev);
-enomem2:
-	dput (d);
-enomem1:
-	iput (inode);
-enomem0:
+Enomem:
 	return -ENOMEM;
 }
 
@@ -2128,6 +2113,7 @@ static struct file_system_type gadgetfs_type = {
 	.mount		= gadgetfs_mount,
 	.kill_sb	= gadgetfs_kill_sb,
 };
+MODULE_ALIAS_FS("gadgetfs");
 
 /*----------------------------------------------------------------------*/
 

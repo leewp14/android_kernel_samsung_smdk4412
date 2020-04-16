@@ -4111,11 +4111,8 @@ static void perf_output_wakeup(struct perf_output_handle *handle)
 {
 	atomic_set(&handle->buffer->poll, POLL_IN);
 
-	if (handle->nmi) {
-		handle->event->pending_wakeup = 1;
-		irq_work_queue(&handle->event->pending);
-	} else
-		perf_event_wakeup(handle->event);
+	handle->event->pending_wakeup = 1;
+	irq_work_queue(&handle->event->pending);
 }
 
 /*
@@ -4265,7 +4262,7 @@ static void perf_event__output_id_sample(struct perf_event *event,
 
 int perf_output_begin(struct perf_output_handle *handle,
 		      struct perf_event *event, unsigned int size,
-		      int nmi, int sample)
+		      int sample)
 {
 	struct perf_buffer *buffer;
 	unsigned long tail, offset, head;
@@ -4290,7 +4287,6 @@ int perf_output_begin(struct perf_output_handle *handle,
 
 	handle->buffer	= buffer;
 	handle->event	= event;
-	handle->nmi	= nmi;
 	handle->sample	= sample;
 
 	if (!buffer->nr_pages)

@@ -91,6 +91,7 @@ static struct file_system_type ext2_fs_type = {
 	.kill_sb	= kill_block_super,
 	.fs_flags	= FS_REQUIRES_DEV,
 };
+MODULE_ALIAS_FS("ext2");
 #define IS_EXT2_SB(sb) ((sb)->s_bdev->bd_holder == &ext2_fs_type)
 #else
 #define IS_EXT2_SB(sb) (0)
@@ -105,6 +106,7 @@ static struct file_system_type ext3_fs_type = {
 	.kill_sb	= kill_block_super,
 	.fs_flags	= FS_REQUIRES_DEV,
 };
+MODULE_ALIAS_FS("ext3");
 #define IS_EXT3_SB(sb) ((sb)->s_bdev->bd_holder == &ext3_fs_type)
 #else
 #define IS_EXT3_SB(sb) (0)
@@ -888,7 +890,6 @@ static int ext4_drop_inode(struct inode *inode)
 static void ext4_i_callback(struct rcu_head *head)
 {
 	struct inode *inode = container_of(head, struct inode, i_rcu);
-	INIT_LIST_HEAD(&inode->i_dentry);
 	kmem_cache_free(ext4_inode_cachep, EXT4_I(inode));
 }
 
@@ -991,11 +992,11 @@ static inline void ext4_show_quota_options(struct seq_file *seq,
  *  - it's set to a non-default value OR
  *  - if the per-sb default is different from the global default
  */
-static int ext4_show_options(struct seq_file *seq, struct vfsmount *vfs)
+static int ext4_show_options(struct seq_file *seq, struct dentry *root)
 {
 	int def_errors;
 	unsigned long def_mount_opts;
-	struct super_block *sb = vfs->mnt_sb;
+	struct super_block *sb = root->d_sb;
 	struct ext4_sb_info *sbi = EXT4_SB(sb);
 	struct ext4_super_block *es = sbi->s_es;
 
@@ -3491,7 +3492,7 @@ static int ext4_fill_super(struct super_block *sb, void *data, int silent)
 
 	INIT_LIST_HEAD(&sbi->s_orphan); /* unlinked but open files */
 	mutex_init(&sbi->s_orphan_lock);
-	mutex_init(&sbi->s_resize_lock);
+	sbi->s_resize_flags = 0;
 
 	sb->s_root = NULL;
 
@@ -3614,7 +3615,7 @@ no_journal:
 		ext4_msg(sb, KERN_ERR, "corrupt root inode, run e2fsck");
 		goto failed_mount4;
 	}
-	sb->s_root = d_alloc_root(root);
+	sb->s_root = d_make_root(root);
 	if (!sb->s_root) {
 		ext4_msg(sb, KERN_ERR, "get root dentry failed");
 		ret = -ENOMEM;
@@ -4679,7 +4680,7 @@ static int ext4_quota_on(struct super_block *sb, int type, int format_id,
 		return -EINVAL;
 
 	/* Quotafile not on the same filesystem? */
-	if (path->mnt->mnt_sb != sb)
+	if (path->dentry->d_sb != sb)
 		return -EXDEV;
 	/* Journaling quota? */
 	if (EXT4_SB(sb)->s_qf_names[type]) {
@@ -4915,7 +4916,6 @@ static inline int ext2_feature_set_ok(struct super_block *sb)
 		return 0;
 	return 1;
 }
-MODULE_ALIAS("ext2");
 #else
 static inline void register_as_ext2(void) { }
 static inline void unregister_as_ext2(void) { }
@@ -4948,7 +4948,6 @@ static inline int ext3_feature_set_ok(struct super_block *sb)
 		return 0;
 	return 1;
 }
-MODULE_ALIAS("ext3");
 #else
 static inline void register_as_ext3(void) { }
 static inline void unregister_as_ext3(void) { }
@@ -4962,6 +4961,7 @@ static struct file_system_type ext4_fs_type = {
 	.kill_sb	= kill_block_super,
 	.fs_flags	= FS_REQUIRES_DEV,
 };
+MODULE_ALIAS_FS("ext4");
 
 static int __init ext4_init_feat_adverts(void)
 {

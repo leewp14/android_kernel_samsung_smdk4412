@@ -323,7 +323,7 @@ out:
  */
 static int
 ecryptfs_create(struct inode *directory_inode, struct dentry *ecryptfs_dentry,
-		int mode, struct nameidata *nd)
+		umode_t mode, struct nameidata *nd)
 {
 	int rc;
 
@@ -530,8 +530,8 @@ static int ecryptfs_link(struct dentry *old_dentry, struct inode *dir,
 		goto out_lock;
 	fsstack_copy_attr_times(dir, lower_dir_dentry->d_inode);
 	fsstack_copy_inode_size(dir, lower_dir_dentry->d_inode);
-	old_dentry->d_inode->i_nlink =
-		ecryptfs_inode_to_lower(old_dentry->d_inode)->i_nlink;
+	set_nlink(old_dentry->d_inode,
+		  ecryptfs_inode_to_lower(old_dentry->d_inode)->i_nlink);
 	i_size_write(new_dentry->d_inode, file_size_save);
 out_lock:
 	unlock_dir(lower_dir_dentry);
@@ -555,8 +555,8 @@ static int ecryptfs_unlink(struct inode *dir, struct dentry *dentry)
 		goto out_unlock;
 	}
 	fsstack_copy_attr_times(dir, lower_dir_inode);
-	dentry->d_inode->i_nlink =
-		ecryptfs_inode_to_lower(dentry->d_inode)->i_nlink;
+	set_nlink(dentry->d_inode,
+		  ecryptfs_inode_to_lower(dentry->d_inode)->i_nlink);
 	dentry->d_inode->i_ctime = dir->i_ctime;
 	d_drop(dentry);
 out_unlock:
@@ -605,7 +605,7 @@ out_lock:
 	return rc;
 }
 
-static int ecryptfs_mkdir(struct inode *dir, struct dentry *dentry, int mode)
+static int ecryptfs_mkdir(struct inode *dir, struct dentry *dentry, umode_t mode)
 {
 	int rc;
 	struct dentry *lower_dentry;
@@ -621,7 +621,7 @@ static int ecryptfs_mkdir(struct inode *dir, struct dentry *dentry, int mode)
 		goto out;
 	fsstack_copy_attr_times(dir, lower_dir_dentry->d_inode);
 	fsstack_copy_inode_size(dir, lower_dir_dentry->d_inode);
-	dir->i_nlink = lower_dir_dentry->d_inode->i_nlink;
+	set_nlink(dir, lower_dir_dentry->d_inode->i_nlink);
 out:
 	unlock_dir(lower_dir_dentry);
 	if (!dentry->d_inode)
@@ -644,7 +644,7 @@ static int ecryptfs_rmdir(struct inode *dir, struct dentry *dentry)
 	if (!rc && dentry->d_inode)
 		clear_nlink(dentry->d_inode);
 	fsstack_copy_attr_times(dir, lower_dir_dentry->d_inode);
-	dir->i_nlink = lower_dir_dentry->d_inode->i_nlink;
+	set_nlink(dir, lower_dir_dentry->d_inode->i_nlink);
 	unlock_dir(lower_dir_dentry);
 	if (!rc)
 		d_drop(dentry);
@@ -653,7 +653,7 @@ static int ecryptfs_rmdir(struct inode *dir, struct dentry *dentry)
 }
 
 static int
-ecryptfs_mknod(struct inode *dir, struct dentry *dentry, int mode, dev_t dev)
+ecryptfs_mknod(struct inode *dir, struct dentry *dentry, umode_t mode, dev_t dev)
 {
 	int rc;
 	struct dentry *lower_dentry;
@@ -995,9 +995,9 @@ int ecryptfs_truncate(struct dentry *dentry, loff_t new_length)
 }
 
 static int
-ecryptfs_permission(struct inode *inode, int mask, unsigned int flags)
+ecryptfs_permission(struct inode *inode, int mask)
 {
-	if (flags & IPERM_FLAG_RCU)
+	if (mask & MAY_NOT_BLOCK)
 		return -ECHILD;
 	return inode_permission(ecryptfs_inode_to_lower(inode), mask);
 }

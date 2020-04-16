@@ -1069,7 +1069,7 @@ static noinline int fixup_inode_link_count(struct btrfs_trans_handle *trans,
 	}
 	btrfs_release_path(path);
 	if (nlink != inode->i_nlink) {
-		inode->i_nlink = nlink;
+		set_nlink(inode, nlink);
 		btrfs_update_inode(trans, root, inode);
 	}
 	BTRFS_I(inode)->index_cnt = (u64)-1;
@@ -2153,9 +2153,9 @@ int btrfs_sync_log(struct btrfs_trans_handle *trans,
 	BUG_ON(ret);
 	btrfs_wait_marked_extents(log, &log->dirty_log_pages, mark);
 
-	btrfs_set_super_log_root(&root->fs_info->super_for_commit,
+	btrfs_set_super_log_root(root->fs_info->super_for_commit,
 				log_root_tree->node->start);
-	btrfs_set_super_log_root_level(&root->fs_info->super_for_commit,
+	btrfs_set_super_log_root_level(root->fs_info->super_for_commit,
 				btrfs_header_level(log_root_tree->node));
 
 	log_root_tree->log_batch = 0;

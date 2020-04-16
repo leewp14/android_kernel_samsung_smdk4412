@@ -85,7 +85,8 @@ struct compressed_bio {
 static inline int compressed_bio_size(struct btrfs_root *root,
 				      unsigned long disk_size)
 {
-	u16 csum_size = btrfs_super_csum_size(&root->fs_info->super_copy);
+	u16 csum_size = btrfs_super_csum_size(root->fs_info->super_copy);
+
 	return sizeof(struct compressed_bio) +
 		((disk_size + root->sectorsize - 1) / root->sectorsize) *
 		csum_size;
@@ -170,7 +171,8 @@ static void end_compressed_bio_read(struct bio *bio, int err)
 		goto out;
 
 	inode = cb->inode;
-	ret = check_compressed_csum(inode, cb, (u64)bio->bi_sector << 9);
+	ret = check_compressed_csum(inode, cb,
+				    (u64)bio->bi_iter.bi_sector << 9);
 	if (ret)
 		goto csum_failed;
 
@@ -370,7 +372,7 @@ int btrfs_submit_compressed_write(struct inode *inode, u64 start,
 	for (pg_index = 0; pg_index < cb->nr_pages; pg_index++) {
 		page = compressed_pages[pg_index];
 		page->mapping = inode->i_mapping;
-		if (bio->bi_size)
+		if (bio->bi_iter.bi_size)
 			ret = io_tree->ops->merge_bio_hook(page, 0,
 							   PAGE_CACHE_SIZE,
 							   bio, 0);
@@ -498,7 +500,7 @@ static noinline int add_ra_bio_pages(struct inode *inode,
 
 		if (!em || last_offset < em->start ||
 		    (last_offset + PAGE_CACHE_SIZE > extent_map_end(em)) ||
-		    (em->block_start >> 9) != cb->orig_bio->bi_sector) {
+		    (em->block_start >> 9) != cb->orig_bio->bi_iter.bi_sector) {
 			free_extent_map(em);
 			unlock_extent(tree, last_offset, end, GFP_NOFS);
 			unlock_page(page);
@@ -544,7 +546,7 @@ next:
  * in it.  We don't actually do IO on those pages but allocate new ones
  * to hold the compressed pages on disk.
  *
- * bio->bi_sector points to the compressed extent on disk
+ * bio->bi_iter.bi_sector points to the compressed extent on disk
  * bio->bi_io_vec points to all of the inode pages
  * bio->bi_vcnt is a count of pages
  *
@@ -565,7 +567,7 @@ int btrfs_submit_compressed_read(struct inode *inode, struct bio *bio,
 	struct page *page;
 	struct block_device *bdev;
 	struct bio *comp_bio;
-	u64 cur_disk_byte = (u64)bio->bi_sector << 9;
+	u64 cur_disk_byte = (u64)bio->bi_iter.bi_sector << 9;
 	u64 em_len;
 	u64 em_start;
 	struct extent_map *em;
@@ -640,7 +642,7 @@ int btrfs_submit_compressed_read(struct inode *inode, struct bio *bio,
 		page->mapping = inode->i_mapping;
 		page->index = em_start >> PAGE_CACHE_SHIFT;
 
-		if (comp_bio->bi_size)
+		if (comp_bio->bi_iter.bi_size)
 			ret = tree->ops->merge_bio_hook(page, 0,
 							PAGE_CACHE_SIZE,
 							comp_bio, 0);
@@ -668,8 +670,8 @@ int btrfs_submit_compressed_read(struct inode *inode, struct bio *bio,
 							comp_bio, sums);
 				BUG_ON(ret);
 			}
-			sums += (comp_bio->bi_size + root->sectorsize - 1) /
-				root->sectorsize;
+			sums += (comp_bio->bi_iter.bi_size +
+				 root->sectorsize - 1) / root->sectorsize;
 
 			ret = btrfs_map_bio(root, READ, comp_bio,
 					    mirror_num, 0);

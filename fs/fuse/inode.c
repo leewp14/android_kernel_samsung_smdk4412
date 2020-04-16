@@ -108,7 +108,6 @@ static struct inode *fuse_alloc_inode(struct super_block *sb)
 static void fuse_i_callback(struct rcu_head *head)
 {
 	struct inode *inode = container_of(head, struct inode, i_rcu);
-	INIT_LIST_HEAD(&inode->i_dentry);
 	kmem_cache_free(fuse_inode_cachep, inode);
 }
 
@@ -164,7 +163,7 @@ void fuse_change_attributes_common(struct inode *inode, struct fuse_attr *attr,
 
 	inode->i_ino     = fuse_squash_ino(attr->ino);
 	inode->i_mode    = (inode->i_mode & S_IFMT) | (attr->mode & 07777);
-	inode->i_nlink   = attr->nlink;
+	set_nlink(inode, attr->nlink);
 	inode->i_uid     = attr->uid;
 	inode->i_gid     = attr->gid;
 	inode->i_blocks  = attr->blocks;
@@ -520,9 +519,10 @@ static int parse_fuse_opt(char *opt, struct fuse_mount_data *d, int is_bdev)
 	return 1;
 }
 
-static int fuse_show_options(struct seq_file *m, struct vfsmount *mnt)
+static int fuse_show_options(struct seq_file *m, struct dentry *root)
 {
-	struct fuse_conn *fc = get_fuse_conn_super(mnt->mnt_sb);
+	struct super_block *sb = root->d_sb;
+	struct fuse_conn *fc = get_fuse_conn_super(sb);
 
 	seq_printf(m, ",user_id=%u", fc->user_id);
 	seq_printf(m, ",group_id=%u", fc->group_id);
@@ -532,9 +532,8 @@ static int fuse_show_options(struct seq_file *m, struct vfsmount *mnt)
 		seq_puts(m, ",allow_other");
 	if (fc->max_read != ~0)
 		seq_printf(m, ",max_read=%u", fc->max_read);
-	if (mnt->mnt_sb->s_bdev &&
-	    mnt->mnt_sb->s_blocksize != FUSE_DEFAULT_BLKSIZE)
-		seq_printf(m, ",blksize=%lu", mnt->mnt_sb->s_blocksize);
+	if (sb->s_bdev && sb->s_blocksize != FUSE_DEFAULT_BLKSIZE)
+		seq_printf(m, ",blksize=%lu", sb->s_blocksize);
 	return 0;
 }
 
@@ -1005,14 +1004,9 @@ static int fuse_fill_super(struct super_block *sb, void *data, int silent)
 
 	err = -ENOMEM;
 	root = fuse_get_root_inode(sb, d.rootmode);
-	if (!root)
+	root_dentry = d_make_root(root);
+	if (!root_dentry)
 		goto err_put_conn;
-
-	root_dentry = d_alloc_root(root);
-	if (!root_dentry) {
-		iput(root);
-		goto err_put_conn;
-	}
 	/* only now - we want root dentry with NULL ->d_op */
 	sb->s_d_op = &fuse_dentry_operations;
 
@@ -1093,6 +1087,7 @@ static struct file_system_type fuse_fs_type = {
 	.mount		= fuse_mount,
 	.kill_sb	= fuse_kill_sb_anon,
 };
+MODULE_ALIAS_FS("fuse");
 
 #ifdef CONFIG_BLOCK
 static struct dentry *fuse_mount_blk(struct file_system_type *fs_type,
@@ -1122,6 +1117,7 @@ static struct file_system_type fuseblk_fs_type = {
 	.kill_sb	= fuse_kill_sb_blk,
 	.fs_flags	= FS_REQUIRES_DEV | FS_HAS_SUBTYPE,
 };
+MODULE_ALIAS_FS("fuseblk");
 
 static inline int register_fuseblk(void)
 {

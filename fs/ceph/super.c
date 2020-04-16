@@ -79,8 +79,7 @@ static int ceph_statfs(struct dentry *dentry, struct kstatfs *buf)
 	buf->f_bsize = 1 << CEPH_BLOCK_SHIFT;
 	buf->f_frsize = 1 << CEPH_BLOCK_SHIFT;
 	buf->f_blocks = le64_to_cpu(st.kb) >> (CEPH_BLOCK_SHIFT-10);
-	buf->f_bfree = (le64_to_cpu(st.kb) - le64_to_cpu(st.kb_used)) >>
-		(CEPH_BLOCK_SHIFT-10);
+	buf->f_bfree = le64_to_cpu(st.kb_avail) >> (CEPH_BLOCK_SHIFT-10);
 	buf->f_bavail = le64_to_cpu(st.kb_avail) >> (CEPH_BLOCK_SHIFT-10);
 
 	buf->f_files = le64_to_cpu(st.num_objects);
@@ -136,6 +135,8 @@ enum {
 	Opt_rbytes,
 	Opt_norbytes,
 	Opt_noasyncreaddir,
+	Opt_dcache,
+	Opt_nodcache,
 	Opt_ino32,
 };
 
@@ -156,6 +157,8 @@ static match_table_t fsopt_tokens = {
 	{Opt_rbytes, "rbytes"},
 	{Opt_norbytes, "norbytes"},
 	{Opt_noasyncreaddir, "noasyncreaddir"},
+	{Opt_dcache, "dcache"},
+	{Opt_nodcache, "nodcache"},
 	{Opt_ino32, "ino32"},
 	{-1, NULL}
 };
@@ -231,6 +234,12 @@ static int parse_fsopt_token(char *c, void *private)
 		break;
 	case Opt_noasyncreaddir:
 		fsopt->flags |= CEPH_MOUNT_OPT_NOASYNCREADDIR;
+		break;
+	case Opt_dcache:
+		fsopt->flags |= CEPH_MOUNT_OPT_DCACHE;
+		break;
+	case Opt_nodcache:
+		fsopt->flags &= ~CEPH_MOUNT_OPT_DCACHE;
 		break;
 	case Opt_ino32:
 		fsopt->flags |= CEPH_MOUNT_OPT_INO32;
@@ -341,11 +350,11 @@ out:
 /**
  * ceph_show_options - Show mount options in /proc/mounts
  * @m: seq_file to write to
- * @mnt: mount descriptor
+ * @root: root of that (sub)tree
  */
-static int ceph_show_options(struct seq_file *m, struct vfsmount *mnt)
+static int ceph_show_options(struct seq_file *m, struct dentry *root)
 {
-	struct ceph_fs_client *fsc = ceph_sb_to_client(mnt->mnt_sb);
+	struct ceph_fs_client *fsc = ceph_sb_to_client(root->d_sb);
 	struct ceph_mount_options *fsopt = fsc->mount_options;
 	struct ceph_options *opt = fsc->client->options;
 
@@ -377,6 +386,10 @@ static int ceph_show_options(struct seq_file *m, struct vfsmount *mnt)
 		seq_puts(m, ",norbytes");
 	if (fsopt->flags & CEPH_MOUNT_OPT_NOASYNCREADDIR)
 		seq_puts(m, ",noasyncreaddir");
+	if (fsopt->flags & CEPH_MOUNT_OPT_DCACHE)
+		seq_puts(m, ",dcache");
+	else
+		seq_puts(m, ",nodcache");
 
 	if (fsopt->wsize)
 		seq_printf(m, ",wsize=%d", fsopt->wsize);
@@ -632,11 +645,17 @@ static struct dentry *open_root_dentry(struct ceph_fs_client *fsc,
 	err = ceph_mdsc_do_request(mdsc, NULL, req);
 	if (err == 0) {
 		dout("open_root_inode success\n");
-		if (ceph_ino(req->r_target_inode) == CEPH_INO_ROOT &&
-		    fsc->sb->s_root == NULL)
-			root = d_alloc_root(req->r_target_inode);
-		else
-			root = d_obtain_alias(req->r_target_inode);
+		if (ceph_ino(inode) == CEPH_INO_ROOT &&
+		    fsc->sb->s_root == NULL) {
+			root = d_make_root(inode);
+			if (!root) {
+				root = ERR_PTR(-ENOMEM);
+				goto out;
+			}
+		} else {
+			root = d_obtain_alias(inode);
+		}
+		ceph_init_dentry(root);
 		req->r_target_inode = NULL;
 		dout("open_root_inode success, root dentry is %p\n", root);
 	} else {
@@ -785,6 +804,10 @@ static int ceph_register_bdi(struct super_block *sb,
 		fsc->backing_dev_info.ra_pages =
 			(fsc->mount_options->rsize + PAGE_CACHE_SIZE - 1)
 			>> PAGE_SHIFT;
+	else
+		fsc->backing_dev_info.ra_pages =
+			default_backing_dev_info.ra_pages;
+
 	err = bdi_register(&fsc->backing_dev_info, NULL, "ceph-%d",
 			   atomic_long_inc_return(&bdi_seq));
 	if (!err)
@@ -885,6 +908,7 @@ static struct file_system_type ceph_fs_type = {
 	.kill_sb	= ceph_kill_sb,
 	.fs_flags	= FS_RENAME_DOES_D_MOVE,
 };
+MODULE_ALIAS_FS("ceph");
 
 #define _STRINGIFY(x) #x
 #define STRINGIFY(x) _STRINGIFY(x)

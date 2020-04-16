@@ -17,7 +17,7 @@
 #include <linux/highmem.h>
 #include <linux/mutex.h>
 #include <linux/radix-tree.h>
-#include <linux/buffer_head.h> /* invalidate_bh_lrus() */
+#include <linux/fs.h>
 #include <linux/slab.h>
 
 #include <asm/uaccess.h>
@@ -323,7 +323,7 @@ out:
 	return err;
 }
 
-static int brd_make_request(struct request_queue *q, struct bio *bio)
+static void brd_make_request(struct request_queue *q, struct bio *bio)
 {
 	struct block_device *bdev = bio->bi_bdev;
 	struct brd_device *brd = bdev->bd_disk->private_data;
@@ -333,14 +333,13 @@ static int brd_make_request(struct request_queue *q, struct bio *bio)
 	int i;
 	int err = -EIO;
 
-	sector = bio->bi_sector;
-	if (sector + (bio->bi_size >> SECTOR_SHIFT) >
-						get_capacity(bdev->bd_disk))
+	sector = bio->bi_iter.bi_sector;
+	if (bio_end_sector(bio) > get_capacity(bdev->bd_disk))
 		goto out;
 
 	if (unlikely(bio->bi_rw & REQ_DISCARD)) {
 		err = 0;
-		discard_from_brd(brd, sector, bio->bi_size);
+		discard_from_brd(brd, sector, bio->bi_iter.bi_size);
 		goto out;
 	}
 
@@ -359,8 +358,6 @@ static int brd_make_request(struct request_queue *q, struct bio *bio)
 
 out:
 	bio_endio(bio, err);
-
-	return 0;
 }
 
 #ifdef CONFIG_BLK_DEV_XIP
@@ -404,14 +401,13 @@ static int brd_ioctl(struct block_device *bdev, fmode_t mode,
 	error = -EBUSY;
 	if (bdev->bd_openers <= 1) {
 		/*
-		 * Invalidate the cache first, so it isn't written
-		 * back to the device.
+		 * Kill the cache first, so it isn't written back to the
+		 * device.
 		 *
 		 * Another thread might instantiate more buffercache here,
 		 * but there is not much we can do to close that race.
 		 */
-		invalidate_bh_lrus();
-		truncate_inode_pages(bdev->bd_inode->i_mapping, 0);
+		kill_bdev(bdev);
 		brd_free_pages(brd);
 		error = 0;
 	}

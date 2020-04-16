@@ -500,7 +500,6 @@ static struct inode *ext3_alloc_inode(struct super_block *sb)
 static void ext3_i_callback(struct rcu_head *head)
 {
 	struct inode *inode = container_of(head, struct inode, i_rcu);
-	INIT_LIST_HEAD(&inode->i_dentry);
 	kmem_cache_free(ext3_inode_cachep, EXT3_I(inode));
 }
 
@@ -600,9 +599,9 @@ static char *data_mode_string(unsigned long mode)
  *  - it's set to a non-default value OR
  *  - if the per-sb default is different from the global default
  */
-static int ext3_show_options(struct seq_file *seq, struct vfsmount *vfs)
+static int ext3_show_options(struct seq_file *seq, struct dentry *root)
 {
-	struct super_block *sb = vfs->mnt_sb;
+	struct super_block *sb = root->d_sb;
 	struct ext3_sb_info *sbi = EXT3_SB(sb);
 	struct ext3_super_block *es = sbi->s_es;
 	unsigned long def_mount_opts;
@@ -2038,10 +2037,9 @@ static int ext3_fill_super (struct super_block *sb, void *data, int silent)
 		ext3_msg(sb, KERN_ERR, "error: corrupt root inode, run e2fsck");
 		goto failed_mount3;
 	}
-	sb->s_root = d_alloc_root(root);
+	sb->s_root = d_make_root(root);
 	if (!sb->s_root) {
 		ext3_msg(sb, KERN_ERR, "error: get root dentry failed");
-		iput(root);
 		ret = -ENOMEM;
 		goto failed_mount3;
 	}
@@ -2900,7 +2898,7 @@ static int ext3_quota_on(struct super_block *sb, int type, int format_id,
 		return -EINVAL;
 
 	/* Quotafile not on the same filesystem? */
-	if (path->mnt->mnt_sb != sb)
+	if (path->dentry->d_sb != sb)
 		return -EXDEV;
 	/* Journaling quota? */
 	if (EXT3_SB(sb)->s_qf_names[type]) {
@@ -3055,6 +3053,7 @@ static struct file_system_type ext3_fs_type = {
 	.kill_sb	= kill_block_super,
 	.fs_flags	= FS_REQUIRES_DEV,
 };
+MODULE_ALIAS_FS("ext3");
 
 static int __init init_ext3_fs(void)
 {

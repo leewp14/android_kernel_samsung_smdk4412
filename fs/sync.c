@@ -6,7 +6,7 @@
 #include <linux/file.h>
 #include <linux/fs.h>
 #include <linux/slab.h>
-#include <linux/module.h>
+#include <linux/export.h>
 #include <linux/namei.h>
 #include <linux/sched.h>
 #include <linux/writeback.h>
@@ -14,7 +14,6 @@
 #include <linux/linkage.h>
 #include <linux/pagemap.h>
 #include <linux/quotaops.h>
-#include <linux/buffer_head.h>
 #include <linux/backing-dev.h>
 #include "internal.h"
 
@@ -165,28 +164,9 @@ SYSCALL_DEFINE1(syncfs, int, fd)
  */
 int vfs_fsync_range(struct file *file, loff_t start, loff_t end, int datasync)
 {
-	struct address_space *mapping = file->f_mapping;
-	int err, ret;
-
-	if (!file->f_op || !file->f_op->fsync) {
-		ret = -EINVAL;
-		goto out;
-	}
-
-	ret = filemap_write_and_wait_range(mapping, start, end);
-
-	/*
-	 * We need to protect against concurrent writers, which could cause
-	 * livelocks in fsync_buffers_list().
-	 */
-	mutex_lock(&mapping->host->i_mutex);
-	err = file->f_op->fsync(file, datasync);
-	if (!ret)
-		ret = err;
-	mutex_unlock(&mapping->host->i_mutex);
-
-out:
-	return ret;
+	if (!file->f_op || !file->f_op->fsync)
+		return -EINVAL;
+	return file->f_op->fsync(file, start, end, datasync);
 }
 EXPORT_SYMBOL(vfs_fsync_range);
 
@@ -361,7 +341,8 @@ SYSCALL_DEFINE(sync_file_range)(int fd, loff_t offset, loff_t nbytes,
 	}
 
 	if (flags & SYNC_FILE_RANGE_WRITE) {
-		ret = filemap_fdatawrite_range(mapping, offset, endbyte);
+		ret = __filemap_fdatawrite_range(mapping, offset, endbyte,
+						 WB_SYNC_NONE);
 		if (ret < 0)
 			goto out_put;
 	}

@@ -18,6 +18,7 @@
 #include <linux/mount.h>
 #include <linux/gfs2_ondisk.h>
 #include <linux/quotaops.h>
+#include <linux/module.h>
 
 #include "gfs2.h"
 #include "incore.h"
@@ -218,7 +219,7 @@ static int gfs2_read_super(struct gfs2_sbd *sdp, sector_t sector, int silent)
 	lock_page(page);
 
 	bio = bio_alloc(GFP_NOFS, 1);
-	bio->bi_sector = sector * (sb->s_blocksize >> 9);
+	bio->bi_iter.bi_sector = sector * (sb->s_blocksize >> 9);
 	bio->bi_bdev = sb->s_bdev;
 	bio_add_page(bio, page, PAGE_SIZE, 0);
 
@@ -431,10 +432,9 @@ static int gfs2_lookup_root(struct super_block *sb, struct dentry **dptr,
 		fs_err(sdp, "can't read in %s inode: %ld\n", name, PTR_ERR(inode));
 		return PTR_ERR(inode);
 	}
-	dentry = d_alloc_root(inode);
+	dentry = d_make_root(inode);
 	if (!dentry) {
 		fs_err(sdp, "can't alloc %s dentry\n", name);
-		iput(inode);
 		return -ENOMEM;
 	}
 	*dptr = dentry;
@@ -1397,6 +1397,7 @@ struct file_system_type gfs2_fs_type = {
 	.kill_sb = gfs2_kill_sb,
 	.owner = THIS_MODULE,
 };
+MODULE_ALIAS_FS("gfs2");
 
 struct file_system_type gfs2meta_fs_type = {
 	.name = "gfs2meta",
@@ -1404,4 +1405,4 @@ struct file_system_type gfs2meta_fs_type = {
 	.mount = gfs2_mount_meta,
 	.owner = THIS_MODULE,
 };
-
+MODULE_ALIAS_FS("gfs2meta");

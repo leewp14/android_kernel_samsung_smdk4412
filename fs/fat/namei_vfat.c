@@ -784,7 +784,7 @@ error:
 	return ERR_PTR(err);
 }
 
-static int vfat_create(struct inode *dir, struct dentry *dentry, int mode,
+static int vfat_create(struct inode *dir, struct dentry *dentry, umode_t mode,
 		       struct nameidata *nd)
 {
 	struct super_block *sb = dir->i_sb;
@@ -873,7 +873,7 @@ out:
 	return err;
 }
 
-static int vfat_mkdir(struct inode *dir, struct dentry *dentry, int mode)
+static int vfat_mkdir(struct inode *dir, struct dentry *dentry, umode_t mode)
 {
 	struct super_block *sb = dir->i_sb;
 	struct inode *inode;
@@ -903,7 +903,7 @@ static int vfat_mkdir(struct inode *dir, struct dentry *dentry, int mode)
 		goto out;
 	}
 	inode->i_version++;
-	inode->i_nlink = 2;
+	set_nlink(inode, 2);
 	inode->i_mtime = inode->i_atime = inode->i_ctime = ts;
 	/* timestamp is already written, so mark_inode_dirty() is unneeded. */
 
@@ -1092,6 +1092,7 @@ static struct file_system_type vfat_fs_type = {
 	.kill_sb	= kill_block_super,
 	.fs_flags	= FS_REQUIRES_DEV,
 };
+MODULE_ALIAS_FS("vfat");
 
 static int __init init_vfat_fs(void)
 {

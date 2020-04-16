@@ -20,7 +20,6 @@
 #include <linux/cramfs_fs.h>
 #include <linux/slab.h>
 #include <linux/cramfs_fs_sb.h>
-#include <linux/buffer_head.h>
 #include <linux/vfs.h>
 #include <linux/mutex.h>
 
@@ -319,11 +318,9 @@ static int cramfs_fill_super(struct super_block *sb, void *data, int silent)
 	root = get_cramfs_inode(sb, &super.root, 0);
 	if (IS_ERR(root))
 		goto out;
-	sb->s_root = d_alloc_root(root);
-	if (!sb->s_root) {
-		iput(root);
+	sb->s_root = d_make_root(root);
+	if (!sb->s_root)
 		goto out;
-	}
 	return 0;
 out:
 	kfree(sbi);
@@ -576,6 +573,7 @@ static struct file_system_type cramfs_fs_type = {
 	.kill_sb	= kill_block_super,
 	.fs_flags	= FS_REQUIRES_DEV,
 };
+MODULE_ALIAS_FS("cramfs");
 
 static int __init init_cramfs_fs(void)
 {

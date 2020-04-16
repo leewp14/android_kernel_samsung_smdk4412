@@ -797,7 +797,7 @@ EXPORT_SYMBOL_GPL(cgroup_unlock);
  * -> cgroup_mkdir.
  */
 
-static int cgroup_mkdir(struct inode *dir, struct dentry *dentry, int mode);
+static int cgroup_mkdir(struct inode *dir, struct dentry *dentry, umode_t mode);
 static struct dentry *cgroup_lookup(struct inode *, struct dentry *, struct nameidata *);
 static int cgroup_rmdir(struct inode *unused_dir, struct dentry *dentry);
 static int cgroup_populate_dir(struct cgroup *cgrp);
@@ -910,7 +910,7 @@ static void cgroup_clear_directory(struct dentry *dentry)
 	spin_lock(&dentry->d_lock);
 	node = dentry->d_subdirs.next;
 	while (node != &dentry->d_subdirs) {
-		struct dentry *d = list_entry(node, struct dentry, d_u.d_child);
+		struct dentry *d = list_entry(node, struct dentry, d_child);
 
 		spin_lock_nested(&d->d_lock, DENTRY_D_LOCK_NESTED);
 		list_del_init(node);
@@ -944,7 +944,7 @@ static void cgroup_d_remove_dir(struct dentry *dentry)
 	parent = dentry->d_parent;
 	spin_lock(&parent->d_lock);
 	spin_lock_nested(&dentry->d_lock, DENTRY_D_LOCK_NESTED);
-	list_del_init(&dentry->d_u.d_child);
+	list_del_init(&dentry->d_child);
 	spin_unlock(&dentry->d_lock);
 	spin_unlock(&parent->d_lock);
 	remove_dir(dentry);
@@ -1048,9 +1048,9 @@ static int rebind_subsystems(struct cgroupfs_root *root,
 	return 0;
 }
 
-static int cgroup_show_options(struct seq_file *seq, struct vfsmount *vfs)
+static int cgroup_show_options(struct seq_file *seq, struct dentry *dentry)
 {
-	struct cgroupfs_root *root = vfs->mnt_sb->s_fs_info;
+	struct cgroupfs_root *root = dentry->d_sb->s_fs_info;
 	struct cgroup_subsys *ss;
 
 	mutex_lock(&cgroup_mutex);
@@ -1462,7 +1462,6 @@ static int cgroup_get_rootdir(struct super_block *sb)
 
 	struct inode *inode =
 		cgroup_new_inode(S_IFDIR | S_IRUGO | S_IXUGO | S_IWUSR, sb);
-	struct dentry *dentry;
 
 	if (!inode)
 		return -ENOMEM;
@@ -1471,12 +1470,9 @@ static int cgroup_get_rootdir(struct super_block *sb)
 	inode->i_op = &cgroup_dir_inode_operations;
 	/* directories start off with i_nlink == 2 (for "." entry) */
 	inc_nlink(inode);
-	dentry = d_alloc_root(inode);
-	if (!dentry) {
-		iput(inode);
+	sb->s_root = d_make_root(inode);
+	if (!sb->s_root)
 		return -ENOMEM;
-	}
-	sb->s_root = dentry;
 	/* for everything else we want ->d_op set */
 	sb->s_d_op = &cgroup_dops;
 	return 0;
@@ -3579,7 +3575,8 @@ static int cgroup_write_event_control(struct cgroup *cgrp, struct cftype *cft,
 	}
 
 	/* the process need read permission on control file */
-	ret = file_permission(cfile, MAY_READ);
+	/* AV: shouldn't we check that it's been opened for read instead? */
+	ret = inode_permission(cfile->f_path.dentry->d_inode, MAY_READ);
 	if (ret < 0)
 		goto fail;
 
@@ -3893,7 +3890,7 @@ static long cgroup_create(struct cgroup *parent, struct dentry *dentry,
 	return err;
 }
 
-static int cgroup_mkdir(struct inode *dir, struct dentry *dentry, int mode)
+static int cgroup_mkdir(struct inode *dir, struct dentry *dentry, umode_t mode)
 {
 	struct cgroup *c_parent = dentry->d_parent->d_fsdata;
 

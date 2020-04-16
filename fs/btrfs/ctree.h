@@ -360,6 +360,47 @@ struct btrfs_header {
 #define BTRFS_LABEL_SIZE 256
 
 /*
+ * just in case we somehow lose the roots and are not able to mount,
+ * we store an array of the roots from previous transactions
+ * in the super.
+ */
+#define BTRFS_NUM_BACKUP_ROOTS 4
+struct btrfs_root_backup {
+	__le64 tree_root;
+	__le64 tree_root_gen;
+
+	__le64 chunk_root;
+	__le64 chunk_root_gen;
+
+	__le64 extent_root;
+	__le64 extent_root_gen;
+
+	__le64 fs_root;
+	__le64 fs_root_gen;
+
+	__le64 dev_root;
+	__le64 dev_root_gen;
+
+	__le64 csum_root;
+	__le64 csum_root_gen;
+
+	__le64 total_bytes;
+	__le64 bytes_used;
+	__le64 num_devices;
+	/* future */
+	__le64 unsed_64[4];
+
+	u8 tree_root_level;
+	u8 chunk_root_level;
+	u8 extent_root_level;
+	u8 fs_root_level;
+	u8 dev_root_level;
+	u8 csum_root_level;
+	/* future and to align */
+	u8 unused_8[10];
+} __attribute__ ((__packed__));
+
+/*
  * the super block basically lists the main trees of the FS
  * it currently lacks any block count etc etc
  */
@@ -405,6 +446,7 @@ struct btrfs_super_block {
 	/* future expansion */
 	__le64 reserved[31];
 	u8 sys_chunk_array[BTRFS_SYSTEM_CHUNK_ARRAY_SIZE];
+	struct btrfs_root_backup super_roots[BTRFS_NUM_BACKUP_ROOTS];
 } __attribute__ ((__packed__));
 
 /*
@@ -939,8 +981,8 @@ struct btrfs_fs_info {
 	wait_queue_head_t transaction_blocked_wait;
 	wait_queue_head_t async_submit_wait;
 
-	struct btrfs_super_block super_copy;
-	struct btrfs_super_block super_for_commit;
+	struct btrfs_super_block *super_copy;
+	struct btrfs_super_block *super_for_commit;
 	struct block_device *__bdev;
 	struct super_block *sb;
 	struct inode *btree_inode;
@@ -1114,6 +1156,9 @@ struct btrfs_fs_info {
 	u64 fs_state;
 
 	struct btrfs_delayed_root *delayed_root;
+
+	/* next backup root to be overwritten */
+	int backup_root_index;
 };
 
 /*
@@ -1219,7 +1264,7 @@ struct btrfs_root {
 	 * right now this just gets used so that a root has its own devid
 	 * for stat.  It may be used for more later
 	 */
-	struct super_block anon_super;
+	dev_t anon_dev;
 };
 
 struct btrfs_ioctl_defrag_range_args {
@@ -1358,6 +1403,7 @@ struct btrfs_ioctl_defrag_range_args {
 #define BTRFS_MOUNT_ENOSPC_DEBUG	 (1 << 15)
 #define BTRFS_MOUNT_AUTO_DEFRAG		(1 << 16)
 #define BTRFS_MOUNT_INODE_MAP_CACHE	(1 << 17)
+#define BTRFS_MOUNT_RECOVERY		(1 << 18)
 
 #define btrfs_clear_opt(o, opt)		((o) &= ~BTRFS_MOUNT_##opt)
 #define btrfs_set_opt(o, opt)		((o) |= BTRFS_MOUNT_##opt)
@@ -1975,6 +2021,55 @@ static inline bool btrfs_root_readonly(struct btrfs_root *root)
 	return (root->root_item.flags & cpu_to_le64(BTRFS_ROOT_SUBVOL_RDONLY)) != 0;
 }
 
+/* struct btrfs_root_backup */
+BTRFS_SETGET_STACK_FUNCS(backup_tree_root, struct btrfs_root_backup,
+		   tree_root, 64);
+BTRFS_SETGET_STACK_FUNCS(backup_tree_root_gen, struct btrfs_root_backup,
+		   tree_root_gen, 64);
+BTRFS_SETGET_STACK_FUNCS(backup_tree_root_level, struct btrfs_root_backup,
+		   tree_root_level, 8);
+
+BTRFS_SETGET_STACK_FUNCS(backup_chunk_root, struct btrfs_root_backup,
+		   chunk_root, 64);
+BTRFS_SETGET_STACK_FUNCS(backup_chunk_root_gen, struct btrfs_root_backup,
+		   chunk_root_gen, 64);
+BTRFS_SETGET_STACK_FUNCS(backup_chunk_root_level, struct btrfs_root_backup,
+		   chunk_root_level, 8);
+
+BTRFS_SETGET_STACK_FUNCS(backup_extent_root, struct btrfs_root_backup,
+		   extent_root, 64);
+BTRFS_SETGET_STACK_FUNCS(backup_extent_root_gen, struct btrfs_root_backup,
+		   extent_root_gen, 64);
+BTRFS_SETGET_STACK_FUNCS(backup_extent_root_level, struct btrfs_root_backup,
+		   extent_root_level, 8);
+
+BTRFS_SETGET_STACK_FUNCS(backup_fs_root, struct btrfs_root_backup,
+		   fs_root, 64);
+BTRFS_SETGET_STACK_FUNCS(backup_fs_root_gen, struct btrfs_root_backup,
+		   fs_root_gen, 64);
+BTRFS_SETGET_STACK_FUNCS(backup_fs_root_level, struct btrfs_root_backup,
+		   fs_root_level, 8);
+
+BTRFS_SETGET_STACK_FUNCS(backup_dev_root, struct btrfs_root_backup,
+		   dev_root, 64);
+BTRFS_SETGET_STACK_FUNCS(backup_dev_root_gen, struct btrfs_root_backup,
+		   dev_root_gen, 64);
+BTRFS_SETGET_STACK_FUNCS(backup_dev_root_level, struct btrfs_root_backup,
+		   dev_root_level, 8);
+
+BTRFS_SETGET_STACK_FUNCS(backup_csum_root, struct btrfs_root_backup,
+		   csum_root, 64);
+BTRFS_SETGET_STACK_FUNCS(backup_csum_root_gen, struct btrfs_root_backup,
+		   csum_root_gen, 64);
+BTRFS_SETGET_STACK_FUNCS(backup_csum_root_level, struct btrfs_root_backup,
+		   csum_root_level, 8);
+BTRFS_SETGET_STACK_FUNCS(backup_total_bytes, struct btrfs_root_backup,
+		   total_bytes, 64);
+BTRFS_SETGET_STACK_FUNCS(backup_bytes_used, struct btrfs_root_backup,
+		   bytes_used, 64);
+BTRFS_SETGET_STACK_FUNCS(backup_num_devices, struct btrfs_root_backup,
+		   num_devices, 64);
+
 /* struct btrfs_super_block */
 
 BTRFS_SETGET_STACK_FUNCS(super_bytenr, struct btrfs_super_block, bytenr, 64);
@@ -2094,7 +2189,7 @@ static inline u32 btrfs_file_extent_inline_item_len(struct extent_buffer *eb,
 	return btrfs_item_size(eb, e) - offset;
 }
 
-static inline struct btrfs_root *btrfs_sb(struct super_block *sb)
+static inline struct btrfs_fs_info *btrfs_sb(struct super_block *sb)
 {
 	return sb->s_fs_info;
 }
@@ -2379,6 +2474,18 @@ static inline int btrfs_fs_closing(struct btrfs_fs_info *fs_info)
 	smp_mb();
 	return fs_info->closing;
 }
+static inline void free_fs_info(struct btrfs_fs_info *fs_info)
+{
+	kfree(fs_info->delayed_root);
+	kfree(fs_info->extent_root);
+	kfree(fs_info->tree_root);
+	kfree(fs_info->chunk_root);
+	kfree(fs_info->dev_root);
+	kfree(fs_info->csum_root);
+	kfree(fs_info->super_copy);
+	kfree(fs_info->super_for_commit);
+	kfree(fs_info);
+}
 
 /* root-item.c */
 int btrfs_find_root_ref(struct btrfs_root *tree_root,
@@ -2602,7 +2709,7 @@ int btrfs_defrag_file(struct inode *inode, struct file *file,
 int btrfs_add_inode_defrag(struct btrfs_trans_handle *trans,
 			   struct inode *inode);
 int btrfs_run_defrag_inodes(struct btrfs_fs_info *fs_info);
-int btrfs_sync_file(struct file *file, int datasync);
+int btrfs_sync_file(struct file *file, loff_t start, loff_t end, int datasync);
 int btrfs_drop_extent_cache(struct inode *inode, u64 start, u64 end,
 			    int skip_pinned);
 extern const struct file_operations btrfs_file_operations;
@@ -2642,7 +2749,7 @@ do {								\
 
 /* acl.c */
 #ifdef CONFIG_BTRFS_FS_POSIX_ACL
-int btrfs_check_acl(struct inode *inode, int mask, unsigned int flags);
+int btrfs_check_acl(struct inode *inode, int mask);
 #else
 #define btrfs_check_acl NULL
 #endif

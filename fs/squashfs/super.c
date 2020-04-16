@@ -316,11 +316,10 @@ check_directory_table:
 	}
 	insert_inode_hash(root);
 
-	sb->s_root = d_alloc_root(root);
+	sb->s_root = d_make_root(root);
 	if (sb->s_root == NULL) {
 		ERROR("Root inode create failed\n");
 		err = -ENOMEM;
-		iput(root);
 		goto failed_mount;
 	}
 
@@ -464,7 +463,6 @@ static struct inode *squashfs_alloc_inode(struct super_block *sb)
 static void squashfs_i_callback(struct rcu_head *head)
 {
 	struct inode *inode = container_of(head, struct inode, i_rcu);
-	INIT_LIST_HEAD(&inode->i_dentry);
 	kmem_cache_free(squashfs_inode_cachep, squashfs_i(inode));
 }
 

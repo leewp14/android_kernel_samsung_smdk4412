@@ -293,8 +293,8 @@ int security_sb_statfs(struct dentry *dentry)
 	return security_ops->sb_statfs(dentry);
 }
 
-int security_sb_mount(char *dev_name, struct path *path,
-                       char *type, unsigned long flags, void *data)
+int security_sb_mount(const char *dev_name, struct path *path,
+                       const char *type, unsigned long flags, void *data)
 {
 	return security_ops->sb_mount(dev_name, path, type, flags, data);
 }
@@ -471,7 +471,7 @@ int security_path_chroot(struct path *path)
 }
 #endif
 
-int security_inode_create(struct inode *dir, struct dentry *dentry, int mode)
+int security_inode_create(struct inode *dir, struct dentry *dentry, umode_t mode)
 {
 	if (unlikely(IS_PRIVATE(dir)))
 		return 0;
@@ -502,7 +502,7 @@ int security_inode_symlink(struct inode *dir, struct dentry *dentry,
 	return security_ops->inode_symlink(dir, dentry, old_name);
 }
 
-int security_inode_mkdir(struct inode *dir, struct dentry *dentry, int mode)
+int security_inode_mkdir(struct inode *dir, struct dentry *dentry, umode_t mode)
 {
 	if (unlikely(IS_PRIVATE(dir)))
 		return 0;
@@ -517,7 +517,7 @@ int security_inode_rmdir(struct inode *dir, struct dentry *dentry)
 	return security_ops->inode_rmdir(dir, dentry);
 }
 
-int security_inode_mknod(struct inode *dir, struct dentry *dentry, int mode, dev_t dev)
+int security_inode_mknod(struct inode *dir, struct dentry *dentry, umode_t mode, dev_t dev)
 {
 	if (unlikely(IS_PRIVATE(dir)))
 		return 0;
@@ -553,13 +553,6 @@ int security_inode_permission(struct inode *inode, int mask)
 	if (unlikely(IS_PRIVATE(inode)))
 		return 0;
 	return security_ops->inode_permission(inode, mask, 0);
-}
-
-int security_inode_exec_permission(struct inode *inode, unsigned int flags)
-{
-	if (unlikely(IS_PRIVATE(inode)))
-		return 0;
-	return security_ops->inode_permission(inode, MAY_EXEC, flags);
 }
 
 int security_inode_setattr(struct dentry *dentry, struct iattr *attr)

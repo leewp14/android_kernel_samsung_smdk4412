@@ -209,9 +209,9 @@ xfs_vn_mknod(
 
 	if (default_acl) {
 		error = -xfs_inherit_acl(inode, default_acl);
+		default_acl = NULL;
 		if (unlikely(error))
 			goto out_cleanup_inode;
-		posix_acl_release(default_acl);
 	}
 
 
@@ -770,6 +770,10 @@ xfs_setup_inode(
 		init_special_inode(inode, inode->i_mode, inode->i_rdev);
 		break;
 	}
+
+	/* if there is no attribute fork no ACL can exist on this inode */
+	if (!XFS_IFORK_Q(ip))
+		cache_no_acl(inode);
 
 	xfs_iflags_clear(ip, XFS_INEW);
 	barrier();

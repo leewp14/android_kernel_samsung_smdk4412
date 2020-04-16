@@ -640,15 +640,21 @@ static struct dentry *ecryptfs_mount(struct file_system_type *fs_type, int flags
 	s->s_maxbytes = path.dentry->d_sb->s_maxbytes;
 	s->s_blocksize = path.dentry->d_sb->s_blocksize;
 	s->s_magic = ECRYPTFS_SUPER_MAGIC;
+	s->s_stack_depth = path.dentry->d_sb->s_stack_depth + 1;
+
+	rc = -EINVAL;
+	if (s->s_stack_depth > FILESYSTEM_MAX_STACK_DEPTH) {
+		pr_err("eCryptfs: maximum fs stacking depth exceeded\n");
+		goto out_free;
+	}
 
 	inode = ecryptfs_get_inode(path.dentry->d_inode, s);
 	rc = PTR_ERR(inode);
 	if (IS_ERR(inode))
 		goto out_free;
 
-	s->s_root = d_alloc_root(inode);
+	s->s_root = d_make_root(inode);
 	if (!s->s_root) {
-		iput(inode);
 		rc = -ENOMEM;
 		goto out_free;
 	}
@@ -703,6 +709,7 @@ static struct file_system_type ecryptfs_fs_type = {
 	.kill_sb = ecryptfs_kill_block_super,
 	.fs_flags = 0
 };
+MODULE_ALIAS_FS("ecryptfs");
 
 /**
  * inode_info_init_once

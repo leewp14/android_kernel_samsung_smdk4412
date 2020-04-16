@@ -231,7 +231,7 @@ static struct dentry *fuse_ctl_add_dentry(struct dentry *parent,
 	if (iop)
 		inode->i_op = iop;
 	inode->i_fop = fop;
-	inode->i_nlink = nlink;
+	set_nlink(inode, nlink);
 	inode->i_private = fc;
 	d_add(dentry, inode);
 	return dentry;
@@ -347,6 +347,7 @@ static struct file_system_type fuse_ctl_fs_type = {
 	.mount		= fuse_ctl_mount,
 	.kill_sb	= fuse_ctl_kill_sb,
 };
+MODULE_ALIAS_FS("fusectl");
 
 int __init fuse_ctl_init(void)
 {

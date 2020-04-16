@@ -26,9 +26,9 @@ struct jffs2_acl_header {
 
 #ifdef CONFIG_JFFS2_FS_POSIX_ACL
 
-extern int jffs2_check_acl(struct inode *, int, unsigned int);
+extern int jffs2_check_acl(struct inode *, int);
 extern int jffs2_acl_chmod(struct inode *);
-extern int jffs2_init_acl_pre(struct inode *, struct inode *, int *);
+extern int jffs2_init_acl_pre(struct inode *, struct inode *, mode_t *);
 extern int jffs2_init_acl_post(struct inode *);
 
 extern const struct xattr_handler jffs2_acl_access_xattr_handler;

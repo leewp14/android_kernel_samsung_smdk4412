@@ -538,7 +538,6 @@ static struct inode *reiserfs_alloc_inode(struct super_block *sb)
 static void reiserfs_i_callback(struct rcu_head *head)
 {
 	struct inode *inode = container_of(head, struct inode, i_rcu);
-	INIT_LIST_HEAD(&inode->i_dentry);
 	kmem_cache_free(reiserfs_inode_cachep, REISERFS_I(inode));
 }
 
@@ -1794,11 +1793,9 @@ static int reiserfs_fill_super(struct super_block *s, void *data, int silent)
 		unlock_new_inode(root_inode);
 	}
 
-	s->s_root = d_alloc_root(root_inode);
-	if (!s->s_root) {
-		iput(root_inode);
+	s->s_root = d_make_root(root_inode);
+	if (!s->s_root)
 		goto error;
-	}
 	// define and initialize hash function
 	sbi->s_hash_function = hash_function(s);
 	if (sbi->s_hash_function == NULL) {
@@ -2089,7 +2086,7 @@ static int reiserfs_quota_on(struct super_block *sb, int type, int format_id,
 	}
 
 	/* Quotafile not on the same filesystem? */
-	if (path->mnt->mnt_sb != sb) {
+	if (path->dentry->d_sb != sb) {
 		err = -EXDEV;
 		goto out;
 	}
@@ -2294,6 +2291,7 @@ struct file_system_type reiserfs_fs_type = {
 	.kill_sb = reiserfs_kill_sb,
 	.fs_flags = FS_REQUIRES_DEV,
 };
+MODULE_ALIAS_FS("reiserfs");
 
 MODULE_DESCRIPTION("ReiserFS journaled filesystem");
 MODULE_AUTHOR("Hans Reiser <reiser@namesys.com>");

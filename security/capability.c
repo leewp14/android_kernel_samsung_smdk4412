@@ -94,8 +94,8 @@ static int cap_sb_statfs(struct dentry *dentry)
 	return 0;
 }
 
-static int cap_sb_mount(char *dev_name, struct path *path, char *type,
-			unsigned long flags, void *data)
+static int cap_sb_mount(const char *dev_name, struct path *path,
+			const char *type, unsigned long flags, void *data)
 {
 	return 0;
 }
@@ -145,7 +145,7 @@ static int cap_inode_init_security(struct inode *inode, struct inode *dir,
 }
 
 static int cap_inode_create(struct inode *inode, struct dentry *dentry,
-			    int mask)
+			    umode_t mask)
 {
 	return 0;
 }
@@ -168,7 +168,7 @@ static int cap_inode_symlink(struct inode *inode, struct dentry *dentry,
 }
 
 static int cap_inode_mkdir(struct inode *inode, struct dentry *dentry,
-			   int mask)
+			   umode_t mask)
 {
 	return 0;
 }
@@ -179,7 +179,7 @@ static int cap_inode_rmdir(struct inode *inode, struct dentry *dentry)
 }
 
 static int cap_inode_mknod(struct inode *inode, struct dentry *dentry,
-			   int mode, dev_t dev)
+			   umode_t mode, dev_t dev)
 {
 	return 0;
 }

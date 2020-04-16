@@ -258,7 +258,7 @@ SYSCALL_DEFINE2(getpriority, int, which, int, who)
 			else
 				p = current;
 			if (p) {
-				niceval = 20 - task_nice(p);
+				niceval = nice_to_rlimit(task_nice(p));
 				if (niceval > retval)
 					retval = niceval;
 			}
@@ -269,7 +269,7 @@ SYSCALL_DEFINE2(getpriority, int, which, int, who)
 			else
 				pgrp = task_pgrp(current);
 			do_each_pid_thread(pgrp, PIDTYPE_PGID, p) {
-				niceval = 20 - task_nice(p);
+				niceval = nice_to_rlimit(task_nice(p));
 				if (niceval > retval)
 					retval = niceval;
 			} while_each_pid_thread(pgrp, PIDTYPE_PGID, p);
@@ -284,7 +284,7 @@ SYSCALL_DEFINE2(getpriority, int, which, int, who)
 
 			do_each_thread(g, p) {
 				if (__task_cred(p)->uid == who) {
-					niceval = 20 - task_nice(p);
+					niceval = nice_to_rlimit(task_nice(p));
 					if (niceval > retval)
 						retval = niceval;
 				}
@@ -2083,11 +2083,11 @@ SYSCALL_DEFINE5(prctl, int, option, unsigned long, arg2, unsigned long, arg3,
 			error = prctl_set_vma(arg2, arg3, arg4, arg5);
 			break;
 		case PR_SET_TIMERSLACK_PID:
-			if (current->pid != (pid_t)arg3 &&
+			if (task_pid_vnr(current) != (pid_t)arg3 &&
 					!capable(CAP_SYS_NICE))
 				return -EPERM;
 			rcu_read_lock();
-			tsk = find_task_by_pid_ns((pid_t)arg3, &init_pid_ns);
+			tsk = find_task_by_vpid((pid_t)arg3);
 			if (tsk == NULL) {
 				rcu_read_unlock();
 				return -EINVAL;

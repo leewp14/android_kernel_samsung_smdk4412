@@ -15,7 +15,7 @@
 #include <linux/namei.h>
 #include <linux/security.h>
 #include <linux/syscalls.h>
-#include <linux/module.h>
+#include <linux/export.h>
 #include <linux/fsnotify.h>
 #include <linux/audit.h>
 #include <asm/uaccess.h>
@@ -67,7 +67,7 @@ xattr_permission(struct inode *inode, const char *name, int mask)
 			return -EPERM;
 	}
 
-	return inode_permission(inode, mask);
+	return inode_permission2(ERR_PTR(-EOPNOTSUPP), inode, mask);
 }
 
 /**
@@ -336,7 +336,7 @@ SYSCALL_DEFINE5(fsetxattr, int, fd, const char __user *, name,
 	error = mnt_want_write_file(f);
 	if (!error) {
 		error = setxattr(dentry, name, value, size, flags);
-		mnt_drop_write(f->f_path.mnt);
+		mnt_drop_write_file(f);
 	}
 	fput(f);
 	return error;
@@ -563,7 +563,7 @@ SYSCALL_DEFINE2(fremovexattr, int, fd, const char __user *, name)
 	error = mnt_want_write_file(f);
 	if (!error) {
 		error = removexattr(dentry, name);
-		mnt_drop_write(f->f_path.mnt);
+		mnt_drop_write_file(f);
 	}
 	fput(f);
 	return error;

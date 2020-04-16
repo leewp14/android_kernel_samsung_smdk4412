@@ -354,7 +354,6 @@ static struct inode *dlmfs_alloc_inode(struct super_block *sb)
 static void dlmfs_i_callback(struct rcu_head *head)
 {
 	struct inode *inode = container_of(head, struct inode, i_rcu);
-	INIT_LIST_HEAD(&inode->i_dentry);
 	kmem_cache_free(dlmfs_inode_cache, DLMFS_I(inode));
 }
 
@@ -489,7 +488,7 @@ static struct inode *dlmfs_get_inode(struct inode *parent,
 /* SMP-safe */
 static int dlmfs_mkdir(struct inode * dir,
 		       struct dentry * dentry,
-		       int mode)
+		       umode_t mode)
 {
 	int status;
 	struct inode *inode = NULL;
@@ -537,7 +536,7 @@ bail:
 
 static int dlmfs_create(struct inode *dir,
 			struct dentry *dentry,
-			int mode,
+			umode_t mode,
 			struct nameidata *nd)
 {
 	int status = 0;
@@ -594,24 +593,14 @@ static int dlmfs_fill_super(struct super_block * sb,
 			    void * data,
 			    int silent)
 {
-	struct inode * inode;
-	struct dentry * root;
-
 	sb->s_maxbytes = MAX_LFS_FILESIZE;
 	sb->s_blocksize = PAGE_CACHE_SIZE;
 	sb->s_blocksize_bits = PAGE_CACHE_SHIFT;
 	sb->s_magic = DLMFS_MAGIC;
 	sb->s_op = &dlmfs_ops;
-	inode = dlmfs_get_root_inode(sb);
-	if (!inode)
+	sb->s_root = d_make_root(dlmfs_get_root_inode(sb));
+	if (!sb->s_root)
 		return -ENOMEM;
-
-	root = d_alloc_root(inode);
-	if (!root) {
-		iput(inode);
-		return -ENOMEM;
-	}
-	sb->s_root = root;
 	return 0;
 }
 
@@ -662,6 +651,7 @@ static struct file_system_type dlmfs_fs_type = {
 	.mount		= dlmfs_mount,
 	.kill_sb	= kill_litter_super,
 };
+MODULE_ALIAS_FS("ocfs2_dlmfs");
 
 static int __init init_dlmfs_fs(void)
 {

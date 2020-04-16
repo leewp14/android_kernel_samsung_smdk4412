@@ -273,7 +273,7 @@ static int msdos_add_entry(struct inode *dir, const unsigned char *name,
 }
 
 /***** Create a file */
-static int msdos_create(struct inode *dir, struct dentry *dentry, int mode,
+static int msdos_create(struct inode *dir, struct dentry *dentry, umode_t mode,
 			struct nameidata *nd)
 {
 	struct super_block *sb = dir->i_sb;
@@ -355,7 +355,7 @@ out:
 }
 
 /***** Make a directory */
-static int msdos_mkdir(struct inode *dir, struct dentry *dentry, int mode)
+static int msdos_mkdir(struct inode *dir, struct dentry *dentry, umode_t mode)
 {
 	struct super_block *sb = dir->i_sb;
 	struct fat_slot_info sinfo;
@@ -396,7 +396,7 @@ static int msdos_mkdir(struct inode *dir, struct dentry *dentry, int mode)
 		/* the directory was completed, just return a error */
 		goto out;
 	}
-	inode->i_nlink = 2;
+	set_nlink(inode, 2);
 	inode->i_mtime = inode->i_atime = inode->i_ctime = ts;
 	/* timestamp is already written, so mark_inode_dirty() is unneeded. */
 
@@ -683,6 +683,7 @@ static struct file_system_type msdos_fs_type = {
 	.kill_sb	= kill_block_super,
 	.fs_flags	= FS_REQUIRES_DEV,
 };
+MODULE_ALIAS_FS("msdos");
 
 static int __init init_msdos_fs(void)
 {

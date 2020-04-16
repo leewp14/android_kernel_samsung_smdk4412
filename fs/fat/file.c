@@ -109,7 +109,7 @@ static int fat_ioctl_set_attributes(struct file *file, u32 __user *user_attr)
 	fat_save_attrs(inode, attr);
 	mark_inode_dirty(inode);
 out_drop_write:
-	mnt_drop_write(file->f_path.mnt);
+	mnt_drop_write_file(file);
 out_unlock_inode:
 	mutex_unlock(&inode->i_mutex);
 out:
@@ -208,12 +208,12 @@ static int fat_file_release(struct inode *inode, struct file *filp)
 	return 0;
 }
 
-int fat_file_fsync(struct file *filp, int datasync)
+int fat_file_fsync(struct file *filp, loff_t start, loff_t end, int datasync)
 {
 	struct inode *inode = filp->f_mapping->host;
 	int res, err;
 
-	res = generic_file_fsync(filp, datasync);
+	res = generic_file_fsync(filp, start, end, datasync);
 	err = sync_mapping_buffers(MSDOS_SB(inode->i_sb)->fat_inode->i_mapping);
 
 	return res ? res : err;
@@ -456,6 +456,8 @@ int fat_setattr(struct dentry *dentry, struct iattr *attr)
 	 * sequence.
 	 */
 	if (attr->ia_valid & ATTR_SIZE) {
+		inode_dio_wait(inode);
+
 		if (attr->ia_size > inode->i_size) {
 			error = fat_cont_expand(inode, attr->ia_size);
 			if (error || attr->ia_valid == ATTR_SIZE)
@@ -488,8 +490,10 @@ int fat_setattr(struct dentry *dentry, struct iattr *attr)
 	}
 
 	if (attr->ia_valid & ATTR_SIZE) {
+		down_write(&MSDOS_I(inode)->truncate_lock);
 		truncate_setsize(inode, attr->ia_size);
 		fat_truncate_blocks(inode, attr->ia_size);
+		up_write(&MSDOS_I(inode)->truncate_lock);
 	}
 
 	setattr_copy(inode, attr);

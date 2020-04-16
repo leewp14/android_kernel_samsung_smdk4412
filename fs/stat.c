@@ -4,7 +4,7 @@
  *  Copyright (C) 1991, 1992  Linus Torvalds
  */
 
-#include <linux/module.h>
+#include <linux/export.h>
 #include <linux/mm.h>
 #include <linux/errno.h>
 #include <linux/file.h>
@@ -27,12 +27,12 @@ void generic_fillattr(struct inode *inode, struct kstat *stat)
 	stat->uid = inode->i_uid;
 	stat->gid = inode->i_gid;
 	stat->rdev = inode->i_rdev;
+	stat->size = i_size_read(inode);
 	stat->atime = inode->i_atime;
 	stat->mtime = inode->i_mtime;
 	stat->ctime = inode->i_ctime;
-	stat->size = i_size_read(inode);
-	stat->blocks = inode->i_blocks;
 	stat->blksize = (1 << inode->i_blkbits);
+	stat->blocks = inode->i_blocks;
 }
 
 EXPORT_SYMBOL(generic_fillattr);

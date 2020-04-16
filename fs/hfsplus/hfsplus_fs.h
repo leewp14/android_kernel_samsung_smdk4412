@@ -404,7 +404,8 @@ int hfsplus_cat_read_inode(struct inode *, struct hfs_find_data *);
 int hfsplus_cat_write_inode(struct inode *);
 struct inode *hfsplus_new_inode(struct super_block *, int);
 void hfsplus_delete_inode(struct inode *);
-int hfsplus_file_fsync(struct file *file, int datasync);
+int hfsplus_file_fsync(struct file *file, loff_t start, loff_t end,
+		       int datasync);
 
 /* ioctl.c */
 long hfsplus_ioctl(struct file *filp, unsigned int cmd, unsigned long arg);
@@ -418,7 +419,7 @@ ssize_t hfsplus_listxattr(struct dentry *dentry, char *buffer, size_t size);
 int hfsplus_parse_options(char *, struct hfsplus_sb_info *);
 int hfsplus_parse_options_remount(char *input, int *force);
 void hfsplus_fill_defaults(struct hfsplus_sb_info *);
-int hfsplus_show_options(struct seq_file *, struct vfsmount *);
+int hfsplus_show_options(struct seq_file *, struct dentry *);
 
 /* super.c */
 struct inode *hfsplus_iget(struct super_block *, unsigned long);

@@ -1409,8 +1409,8 @@ struct security_operations {
 	int (*sb_kern_mount) (struct super_block *sb, int flags, void *data);
 	int (*sb_show_options) (struct seq_file *m, struct super_block *sb);
 	int (*sb_statfs) (struct dentry *dentry);
-	int (*sb_mount) (char *dev_name, struct path *path,
-			 char *type, unsigned long flags, void *data);
+	int (*sb_mount) (const char *dev_name, struct path *path,
+			 const char *type, unsigned long flags, void *data);
 	int (*sb_umount) (struct vfsmount *mnt, int flags);
 	int (*sb_pivotroot) (struct path *old_path,
 			     struct path *new_path);
@@ -1445,16 +1445,16 @@ struct security_operations {
 				    const struct qstr *qstr, char **name,
 				    void **value, size_t *len);
 	int (*inode_create) (struct inode *dir,
-			     struct dentry *dentry, int mode);
+			     struct dentry *dentry, umode_t mode);
 	int (*inode_link) (struct dentry *old_dentry,
 			   struct inode *dir, struct dentry *new_dentry);
 	int (*inode_unlink) (struct inode *dir, struct dentry *dentry);
 	int (*inode_symlink) (struct inode *dir,
 			      struct dentry *dentry, const char *old_name);
-	int (*inode_mkdir) (struct inode *dir, struct dentry *dentry, int mode);
+	int (*inode_mkdir) (struct inode *dir, struct dentry *dentry, umode_t mode);
 	int (*inode_rmdir) (struct inode *dir, struct dentry *dentry);
 	int (*inode_mknod) (struct inode *dir, struct dentry *dentry,
-			    int mode, dev_t dev);
+			    umode_t mode, dev_t dev);
 	int (*inode_rename) (struct inode *old_dir, struct dentry *old_dentry,
 			     struct inode *new_dir, struct dentry *new_dentry);
 	int (*inode_readlink) (struct dentry *dentry);
@@ -1696,8 +1696,8 @@ int security_sb_remount(struct super_block *sb, void *data);
 int security_sb_kern_mount(struct super_block *sb, int flags, void *data);
 int security_sb_show_options(struct seq_file *m, struct super_block *sb);
 int security_sb_statfs(struct dentry *dentry);
-int security_sb_mount(char *dev_name, struct path *path,
-		      char *type, unsigned long flags, void *data);
+int security_sb_mount(const char *dev_name, struct path *path,
+		      const char *type, unsigned long flags, void *data);
 int security_sb_umount(struct vfsmount *mnt, int flags);
 int security_sb_pivotroot(struct path *old_path, struct path *new_path);
 int security_sb_set_mnt_opts(struct super_block *sb, struct security_mnt_opts *opts);
@@ -1713,21 +1713,20 @@ int security_inode_init_security(struct inode *inode, struct inode *dir,
 int security_new_inode_init_security(struct inode *inode, struct inode *dir,
 				 const struct qstr *qstr,
 				 initxattrs initxattrs, void *fs_data);
-int security_inode_create(struct inode *dir, struct dentry *dentry, int mode);
+int security_inode_create(struct inode *dir, struct dentry *dentry, umode_t mode);
 int security_inode_link(struct dentry *old_dentry, struct inode *dir,
 			 struct dentry *new_dentry);
 int security_inode_unlink(struct inode *dir, struct dentry *dentry);
 int security_inode_symlink(struct inode *dir, struct dentry *dentry,
 			   const char *old_name);
-int security_inode_mkdir(struct inode *dir, struct dentry *dentry, int mode);
+int security_inode_mkdir(struct inode *dir, struct dentry *dentry, umode_t mode);
 int security_inode_rmdir(struct inode *dir, struct dentry *dentry);
-int security_inode_mknod(struct inode *dir, struct dentry *dentry, int mode, dev_t dev);
+int security_inode_mknod(struct inode *dir, struct dentry *dentry, umode_t mode, dev_t dev);
 int security_inode_rename(struct inode *old_dir, struct dentry *old_dentry,
 			  struct inode *new_dir, struct dentry *new_dentry);
 int security_inode_readlink(struct dentry *dentry);
 int security_inode_follow_link(struct dentry *dentry, struct nameidata *nd);
 int security_inode_permission(struct inode *inode, int mask);
-int security_inode_exec_permission(struct inode *inode, unsigned int flags);
 int security_inode_setattr(struct dentry *dentry, struct iattr *attr);
 int security_inode_getattr(struct vfsmount *mnt, struct dentry *dentry);
 int security_inode_setxattr(struct dentry *dentry, const char *name,
@@ -2000,8 +1999,8 @@ static inline int security_sb_statfs(struct dentry *dentry)
 	return 0;
 }
 
-static inline int security_sb_mount(char *dev_name, struct path *path,
-				    char *type, unsigned long flags,
+static inline int security_sb_mount(const char *dev_name, struct path *path,
+				    const char *type, unsigned long flags,
 				    void *data)
 {
 	return 0;
@@ -2062,7 +2061,7 @@ static inline int security_new_inode_init_security(struct inode *inode,
 
 static inline int security_inode_create(struct inode *dir,
 					 struct dentry *dentry,
-					 int mode)
+					 umode_t mode)
 {
 	return 0;
 }
@@ -2127,12 +2126,6 @@ static inline int security_inode_follow_link(struct dentry *dentry,
 }
 
 static inline int security_inode_permission(struct inode *inode, int mask)
-{
-	return 0;
-}
-
-static inline int security_inode_exec_permission(struct inode *inode,
-						  unsigned int flags)
 {
 	return 0;
 }

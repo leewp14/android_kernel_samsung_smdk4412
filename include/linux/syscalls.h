@@ -475,7 +475,7 @@ asmlinkage long sys_mincore(unsigned long start, size_t len,
 asmlinkage long sys_pivot_root(const char __user *new_root,
 				const char __user *put_old);
 asmlinkage long sys_chroot(const char __user *filename);
-asmlinkage long sys_mknod(const char __user *filename, int mode,
+asmlinkage long sys_mknod(const char __user *filename, umode_t mode,
 				unsigned dev);
 asmlinkage long sys_link(const char __user *oldname,
 				const char __user *newname);
@@ -517,9 +517,9 @@ asmlinkage long sys_sendfile64(int out_fd, int in_fd,
 			       loff_t __user *offset, size_t count);
 asmlinkage long sys_readlink(const char __user *path,
 				char __user *buf, int bufsiz);
-asmlinkage long sys_creat(const char __user *pathname, int mode);
+asmlinkage long sys_creat(const char __user *pathname, umode_t mode);
 asmlinkage long sys_open(const char __user *filename,
-				int flags, int mode);
+				int flags, umode_t mode);
 asmlinkage long sys_close(unsigned int fd);
 asmlinkage long sys_access(const char __user *filename, int mode);
 asmlinkage long sys_vhangup(void);
@@ -582,7 +582,7 @@ asmlinkage long sys_preadv(unsigned long fd, const struct iovec __user *vec,
 asmlinkage long sys_pwritev(unsigned long fd, const struct iovec __user *vec,
 			    unsigned long vlen, unsigned long pos_l, unsigned long pos_h);
 asmlinkage long sys_getcwd(char __user *buf, unsigned long size);
-asmlinkage long sys_mkdir(const char __user *pathname, int mode);
+asmlinkage long sys_mkdir(const char __user *pathname, umode_t mode);
 asmlinkage long sys_chdir(const char __user *filename);
 asmlinkage long sys_fchdir(unsigned int fd);
 asmlinkage long sys_rmdir(const char __user *pathname);
@@ -755,9 +755,9 @@ asmlinkage long sys_spu_run(int fd, __u32 __user *unpc,
 asmlinkage long sys_spu_create(const char __user *name,
 		unsigned int flags, mode_t mode, int fd);
 
-asmlinkage long sys_mknodat(int dfd, const char __user * filename, int mode,
+asmlinkage long sys_mknodat(int dfd, const char __user * filename, umode_t mode,
 			    unsigned dev);
-asmlinkage long sys_mkdirat(int dfd, const char __user * pathname, int mode);
+asmlinkage long sys_mkdirat(int dfd, const char __user * pathname, umode_t mode);
 asmlinkage long sys_unlinkat(int dfd, const char __user * pathname, int flag);
 asmlinkage long sys_symlinkat(const char __user * oldname,
 			      int newdfd, const char __user * newname);
@@ -773,7 +773,7 @@ asmlinkage long sys_fchmodat(int dfd, const char __user * filename,
 asmlinkage long sys_fchownat(int dfd, const char __user *filename, uid_t user,
 			     gid_t group, int flag);
 asmlinkage long sys_openat(int dfd, const char __user *filename, int flags,
-			   int mode);
+			   umode_t mode);
 asmlinkage long sys_newfstatat(int dfd, const char __user *filename,
 			       struct stat __user *statbuf, int flag);
 asmlinkage long sys_fstatat64(int dfd, const char __user *filename,
@@ -812,6 +812,7 @@ asmlinkage long sys_timerfd_settime(int ufd, int flags,
 asmlinkage long sys_timerfd_gettime(int ufd, struct itimerspec __user *otmr);
 asmlinkage long sys_eventfd(unsigned int count);
 asmlinkage long sys_eventfd2(unsigned int count, int flags);
+asmlinkage long sys_memfd_create(const char __user *uname_ptr, unsigned int flags);
 asmlinkage long sys_fallocate(int fd, int mode, loff_t offset, loff_t len);
 asmlinkage long sys_old_readdir(unsigned int, struct old_linux_dirent __user *, unsigned int);
 asmlinkage long sys_pselect6(int, fd_set __user *, fd_set __user *,
@@ -858,4 +859,11 @@ asmlinkage long sys_process_vm_writev(pid_t pid,
 				      unsigned long flags);
 asmlinkage long sys_seccomp(unsigned int op, unsigned int flags,
 			    const char __user *uargs);
+
+asmlinkage long sys_kcmp(pid_t pid1, pid_t pid2, int type,
+			 unsigned long idx1, unsigned long idx2);
+asmlinkage long sys_finit_module(int fd, const char __user *uargs, int flags);
+asmlinkage long sys_getrandom(char __user *buf, size_t count,
+			      unsigned int flags);
+
 #endif

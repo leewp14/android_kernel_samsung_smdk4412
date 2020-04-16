@@ -259,13 +259,10 @@ static int jffs2_set_acl(struct inode *inode, int type, struct posix_acl *acl)
 	return rc;
 }
 
-int jffs2_check_acl(struct inode *inode, int mask, unsigned int flags)
+int jffs2_check_acl(struct inode *inode, int mask)
 {
 	struct posix_acl *acl;
 	int rc;
-
-	if (flags & IPERM_FLAG_RCU)
-		return -ECHILD;
 
 	acl = jffs2_get_acl(inode, ACL_TYPE_ACCESS);
 	if (IS_ERR(acl))
@@ -278,9 +275,9 @@ int jffs2_check_acl(struct inode *inode, int mask, unsigned int flags)
 	return -EAGAIN;
 }
 
-int jffs2_init_acl_pre(struct inode *dir_i, struct inode *inode, int *i_mode)
+int jffs2_init_acl_pre(struct inode *dir_i, struct inode *inode, mode_t *i_mode)
 {
-	struct posix_acl *acl, *clone;
+	struct posix_acl *acl;
 	int rc;
 
 	cache_no_acl(inode);
@@ -298,18 +295,13 @@ int jffs2_init_acl_pre(struct inode *dir_i, struct inode *inode, int *i_mode)
 		if (S_ISDIR(*i_mode))
 			set_cached_acl(inode, ACL_TYPE_DEFAULT, acl);
 
-		clone = posix_acl_clone(acl, GFP_KERNEL);
-		if (!clone)
-			return -ENOMEM;
-		rc = posix_acl_create_masq(clone, (mode_t *)i_mode);
-		if (rc < 0) {
-			posix_acl_release(clone);
+		rc = posix_acl_create(&acl, GFP_KERNEL, i_mode);
+		if (rc < 0)
 			return rc;
-		}
 		if (rc > 0)
-			set_cached_acl(inode, ACL_TYPE_ACCESS, clone);
+			set_cached_acl(inode, ACL_TYPE_ACCESS, acl);
 
-		posix_acl_release(clone);
+		posix_acl_release(acl);
 	}
 	return 0;
 }
@@ -335,7 +327,7 @@ int jffs2_init_acl_post(struct inode *inode)
 
 int jffs2_acl_chmod(struct inode *inode)
 {
-	struct posix_acl *acl, *clone;
+	struct posix_acl *acl;
 	int rc;
 
 	if (S_ISLNK(inode->i_mode))
@@ -343,14 +335,11 @@ int jffs2_acl_chmod(struct inode *inode)
 	acl = jffs2_get_acl(inode, ACL_TYPE_ACCESS);
 	if (IS_ERR(acl) || !acl)
 		return PTR_ERR(acl);
-	clone = posix_acl_clone(acl, GFP_KERNEL);
+	rc = posix_acl_chmod(&acl, GFP_KERNEL, inode->i_mode);
+	if (rc)
+		return rc;
+	rc = jffs2_set_acl(inode, ACL_TYPE_ACCESS, acl);
 	posix_acl_release(acl);
-	if (!clone)
-		return -ENOMEM;
-	rc = posix_acl_chmod_masq(clone, inode->i_mode);
-	if (!rc)
-		rc = jffs2_set_acl(inode, ACL_TYPE_ACCESS, clone);
-	posix_acl_release(clone);
 	return rc;
 }
 

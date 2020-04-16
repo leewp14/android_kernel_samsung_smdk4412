@@ -13,7 +13,7 @@
  */
 
 #include <linux/kernel.h>
-#include <linux/module.h>
+#include <linux/export.h>
 #include <linux/mm.h>
 #include <linux/kdev_t.h>
 #include <linux/gfp.h>
@@ -94,7 +94,7 @@ mpage_alloc(struct block_device *bdev,
 
 	if (bio) {
 		bio->bi_bdev = bdev;
-		bio->bi_sector = first_sector;
+		bio->bi_iter.bi_sector = first_sector;
 	}
 	return bio;
 }

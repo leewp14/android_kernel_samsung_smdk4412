@@ -17,6 +17,7 @@
 #include <linux/module.h>
 #include <linux/blkpg.h>
 #include <linux/buffer_head.h>
+#include <linux/swap.h>
 #include <linux/pagevec.h>
 #include <linux/writeback.h>
 #include <linux/mpage.h>
@@ -25,6 +26,7 @@
 #include <linux/namei.h>
 #include <linux/log2.h>
 #include <linux/kmemleak.h>
+#include <linux/cleancache.h>
 #include <asm/uaccess.h>
 #include "internal.h"
 
@@ -86,13 +88,35 @@ sector_t blkdev_max_block(struct block_device *bdev)
 }
 
 /* Kill _all_ buffers and pagecache , dirty or not.. */
-static void kill_bdev(struct block_device *bdev)
+void kill_bdev(struct block_device *bdev)
 {
-	if (bdev->bd_inode->i_mapping->nrpages == 0)
+	struct address_space *mapping = bdev->bd_inode->i_mapping;
+
+	if (mapping->nrpages == 0)
 		return;
+
 	invalidate_bh_lrus();
-	truncate_inode_pages(bdev->bd_inode->i_mapping, 0);
+	truncate_inode_pages(mapping, 0);
 }	
+EXPORT_SYMBOL(kill_bdev);
+
+/* Invalidate clean unused buffers and pagecache. */
+void invalidate_bdev(struct block_device *bdev)
+{
+	struct address_space *mapping = bdev->bd_inode->i_mapping;
+
+	if (mapping->nrpages == 0)
+		return;
+
+	invalidate_bh_lrus();
+	lru_add_drain_all();	/* make sure all lru add caches are flushed */
+	invalidate_mapping_pages(mapping, 0, -1);
+	/* 99% of the time, we don't need to flush the cleancache on the bdev.
+	 * But, for the strange corners, lets be cautious
+	 */
+	cleancache_flush_inode(mapping);
+}
+EXPORT_SYMBOL(invalidate_bdev);
 
 int set_blocksize(struct block_device *bdev, int size)
 {
@@ -381,7 +405,7 @@ static loff_t block_llseek(struct file *file, loff_t offset, int origin)
 	return retval;
 }
 	
-int blkdev_fsync(struct file *filp, int datasync)
+int blkdev_fsync(struct file *filp, loff_t start, loff_t end, int datasync)
 {
 	struct inode *bd_inode = filp->f_mapping->host;
 	struct block_device *bdev = I_BDEV(bd_inode);
@@ -392,13 +416,9 @@ int blkdev_fsync(struct file *filp, int datasync)
 	 * i_mutex and doing so causes performance issues with concurrent
 	 * O_SYNC writers to a block device.
 	 */
-	mutex_unlock(&bd_inode->i_mutex);
-
 	error = blkdev_issue_flush(bdev, GFP_KERNEL, NULL);
 	if (error == -EOPNOTSUPP)
 		error = 0;
-
-	mutex_lock(&bd_inode->i_mutex);
 
 	return error;
 }
@@ -424,7 +444,6 @@ static void bdev_i_callback(struct rcu_head *head)
 	struct inode *inode = container_of(head, struct inode, i_rcu);
 	struct bdev_inode *bdi = BDEV_I(inode);
 
-	INIT_LIST_HEAD(&inode->i_dentry);
 	kmem_cache_free(bdev_cachep, bdi);
 }
 
@@ -492,7 +511,7 @@ static struct file_system_type bd_type = {
 	.kill_sb	= kill_anon_super,
 };
 
-struct super_block *blockdev_superblock __read_mostly;
+static struct super_block *blockdev_superblock __read_mostly;
 
 void __init bdev_cache_init(void)
 {
@@ -636,6 +655,11 @@ static struct block_device *bd_acquire(struct inode *inode)
 		spin_unlock(&bdev_lock);
 	}
 	return bdev;
+}
+
+static inline int sb_is_blkdev_sb(struct super_block *sb)
+{
+	return sb == blockdev_superblock;
 }
 
 /* Call when you free inode */

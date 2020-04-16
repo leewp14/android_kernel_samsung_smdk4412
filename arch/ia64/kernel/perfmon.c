@@ -631,6 +631,7 @@ static struct file_system_type pfm_fs_type = {
 	.mount    = pfmfs_mount,
 	.kill_sb  = kill_anon_super,
 };
+MODULE_ALIAS_FS("pfmfs");
 
 DEFINE_PER_CPU(unsigned long, pfm_syst_info);
 DEFINE_PER_CPU(struct task_struct *, pmu_owner);
@@ -2227,7 +2228,7 @@ pfm_alloc_file(pfm_context_t *ctx)
 	/*
 	 * allocate a new dcache entry
 	 */
-	path.dentry = d_alloc(pfmfs_mnt->mnt_sb->s_root, &this);
+	path.dentry = d_alloc(pfmfs_mnt->mnt_root, &this);
 	if (!path.dentry) {
 		iput(inode);
 		return ERR_PTR(-ENOMEM);

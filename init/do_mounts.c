@@ -16,6 +16,8 @@
 #include <linux/async.h>
 #include <linux/fs_struct.h>
 #include <linux/slab.h>
+#include <linux/ramfs.h>
+#include <linux/shmem_fs.h>
 
 #include <linux/nfs_fs.h>
 #include <linux/nfs_fs_sb.h>
@@ -287,17 +289,19 @@ static void __init get_fs_names(char *page)
 
 static int __init do_mount_root(char *name, char *fs, int flags, void *data)
 {
+	struct super_block *s;
 	int err = sys_mount(name, "/root", fs, flags, data);
 	if (err)
 		return err;
 
 	sys_chdir((const char __user __force *)"/root");
-	ROOT_DEV = current->fs->pwd.mnt->mnt_sb->s_dev;
+	s = current->fs->pwd.dentry->d_sb;
+	ROOT_DEV = s->s_dev;
 	printk(KERN_INFO
 	       "VFS: Mounted root (%s filesystem)%s on device %u:%u.\n",
-	       current->fs->pwd.mnt->mnt_sb->s_type->name,
-	       current->fs->pwd.mnt->mnt_sb->s_flags & MS_RDONLY ?
-	       " readonly" : "", MAJOR(ROOT_DEV), MINOR(ROOT_DEV));
+	       s->s_type->name,
+	       s->s_flags & MS_RDONLY ?  " readonly" : "",
+	       MAJOR(ROOT_DEV), MINOR(ROOT_DEV));
 	return 0;
 }
 
@@ -481,6 +485,7 @@ void __init prepare_namespace(void)
 	wait_for_device_probe();
 
 	md_run_setup();
+	dm_run_setup();
 
 	if (saved_root_name[0]) {
 		root_device_name = saved_root_name;
@@ -517,4 +522,47 @@ out:
 	devtmpfs_mount("dev");
 	sys_mount(".", "/", NULL, MS_MOVE, NULL);
 	sys_chroot((const char __user __force *)".");
+}
+
+static bool is_tmpfs;
+static struct dentry *rootfs_mount(struct file_system_type *fs_type,
+	int flags, const char *dev_name, void *data)
+{
+	static unsigned long once;
+	void *fill = ramfs_fill_super;
+
+	if (test_and_set_bit(0, &once))
+		return ERR_PTR(-ENODEV);
+
+	if (IS_ENABLED(CONFIG_TMPFS) && is_tmpfs)
+		fill = shmem_fill_super;
+
+	return mount_nodev(fs_type, flags, data, fill);
+}
+
+static struct file_system_type rootfs_fs_type = {
+	.name		= "rootfs",
+	.mount		= rootfs_mount,
+	.kill_sb	= kill_litter_super,
+};
+
+int __init init_rootfs(void)
+{
+	int err = register_filesystem(&rootfs_fs_type);
+
+	if (err)
+		return err;
+
+	if (IS_ENABLED(CONFIG_TMPFS) && !saved_root_name[0] &&
+		(!root_fs_names || strstr(root_fs_names, "tmpfs"))) {
+		err = shmem_init();
+		is_tmpfs = true;
+	} else {
+		err = init_ramfs_fs();
+	}
+
+	if (err)
+		unregister_filesystem(&rootfs_fs_type);
+
+	return err;
 }

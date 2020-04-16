@@ -1563,6 +1563,7 @@ int test_range_bit(struct extent_io_tree *tree, u64 start, u64 end,
 	struct rb_node *node;
 	int bitset = 0;
 
+
 	spin_lock(&tree->lock);
 	if (cached && cached->tree && cached->start == start)
 		node = &cached->rb_node;
@@ -1831,7 +1832,7 @@ btrfs_bio_alloc(struct block_device *bdev, u64 first_sector, int nr_vecs,
 	if (bio) {
 		bio->bi_size = 0;
 		bio->bi_bdev = bdev;
-		bio->bi_sector = first_sector;
+		bio->bi_iter.bi_sector = first_sector;
 	}
 	return bio;
 }
@@ -1884,10 +1885,9 @@ static int submit_extent_page(int rw, struct extent_io_tree *tree,
 	if (bio_ret && *bio_ret) {
 		bio = *bio_ret;
 		if (old_compressed)
-			contig = bio->bi_sector == sector;
+			contig = bio->bi_iter.bi_sector == sector;
 		else
-			contig = bio->bi_sector + (bio->bi_size >> 9) ==
-				sector;
+			contig = bio_end_sector(bio) == sector;
 
 		if (prev_bio_flags != bio_flags || !contig ||
 		    (tree->ops && tree->ops->merge_bio_hook &&
@@ -3119,7 +3119,7 @@ struct extent_buffer *alloc_extent_buffer(struct extent_io_tree *tree,
 		i = 0;
 	}
 	for (; i < num_pages; i++, index++) {
-		p = find_or_create_page(mapping, index, GFP_NOFS | __GFP_HIGHMEM);
+		p = find_or_create_page(mapping, index, GFP_NOFS);
 		if (!p) {
 			WARN_ON(1);
 			goto free_eb;
@@ -3492,9 +3492,8 @@ void read_extent_buffer(struct extent_buffer *eb, void *dstv,
 		page = extent_buffer_page(eb, i);
 
 		cur = min(len, (PAGE_CACHE_SIZE - offset));
-		kaddr = kmap_atomic(page, KM_USER1);
+		kaddr = page_address(page);
 		memcpy(dst, kaddr + offset, cur);
-		kunmap_atomic(kaddr, KM_USER1);
 
 		dst += cur;
 		len -= cur;
@@ -3504,9 +3503,9 @@ void read_extent_buffer(struct extent_buffer *eb, void *dstv,
 }
 
 int map_private_extent_buffer(struct extent_buffer *eb, unsigned long start,
-			       unsigned long min_len, char **token, char **map,
+			       unsigned long min_len, char **map,
 			       unsigned long *map_start,
-			       unsigned long *map_len, int km)
+			       unsigned long *map_len)
 {
 	size_t offset = start & (PAGE_CACHE_SIZE - 1);
 	char *kaddr;
@@ -3536,40 +3535,10 @@ int map_private_extent_buffer(struct extent_buffer *eb, unsigned long start,
 	}
 
 	p = extent_buffer_page(eb, i);
-	kaddr = kmap_atomic(p, km);
-	*token = kaddr;
+	kaddr = page_address(p);
 	*map = kaddr + offset;
 	*map_len = PAGE_CACHE_SIZE - offset;
 	return 0;
-}
-
-int map_extent_buffer(struct extent_buffer *eb, unsigned long start,
-		      unsigned long min_len,
-		      char **token, char **map,
-		      unsigned long *map_start,
-		      unsigned long *map_len, int km)
-{
-	int err;
-	int save = 0;
-	if (eb->map_token) {
-		unmap_extent_buffer(eb, eb->map_token, km);
-		eb->map_token = NULL;
-		save = 1;
-	}
-	err = map_private_extent_buffer(eb, start, min_len, token, map,
-				       map_start, map_len, km);
-	if (!err && save) {
-		eb->map_token = *token;
-		eb->kaddr = *map;
-		eb->map_start = *map_start;
-		eb->map_len = *map_len;
-	}
-	return err;
-}
-
-void unmap_extent_buffer(struct extent_buffer *eb, char *token, int km)
-{
-	kunmap_atomic(token, km);
 }
 
 int memcmp_extent_buffer(struct extent_buffer *eb, const void *ptrv,
@@ -3595,9 +3564,8 @@ int memcmp_extent_buffer(struct extent_buffer *eb, const void *ptrv,
 
 		cur = min(len, (PAGE_CACHE_SIZE - offset));
 
-		kaddr = kmap_atomic(page, KM_USER0);
+		kaddr = page_address(page);
 		ret = memcmp(ptr, kaddr + offset, cur);
-		kunmap_atomic(kaddr, KM_USER0);
 		if (ret)
 			break;
 
@@ -3630,9 +3598,8 @@ void write_extent_buffer(struct extent_buffer *eb, const void *srcv,
 		WARN_ON(!PageUptodate(page));
 
 		cur = min(len, PAGE_CACHE_SIZE - offset);
-		kaddr = kmap_atomic(page, KM_USER1);
+		kaddr = page_address(page);
 		memcpy(kaddr + offset, src, cur);
-		kunmap_atomic(kaddr, KM_USER1);
 
 		src += cur;
 		len -= cur;
@@ -3661,9 +3628,8 @@ void memset_extent_buffer(struct extent_buffer *eb, char c,
 		WARN_ON(!PageUptodate(page));
 
 		cur = min(len, PAGE_CACHE_SIZE - offset);
-		kaddr = kmap_atomic(page, KM_USER0);
+		kaddr = page_address(page);
 		memset(kaddr + offset, c, cur);
-		kunmap_atomic(kaddr, KM_USER0);
 
 		len -= cur;
 		offset = 0;
@@ -3694,9 +3660,8 @@ void copy_extent_buffer(struct extent_buffer *dst, struct extent_buffer *src,
 
 		cur = min(len, (unsigned long)(PAGE_CACHE_SIZE - offset));
 
-		kaddr = kmap_atomic(page, KM_USER0);
+		kaddr = page_address(page);
 		read_extent_buffer(src, kaddr + offset, src_offset, cur);
-		kunmap_atomic(kaddr, KM_USER0);
 
 		src_offset += cur;
 		len -= cur;
@@ -3709,20 +3674,17 @@ static void move_pages(struct page *dst_page, struct page *src_page,
 		       unsigned long dst_off, unsigned long src_off,
 		       unsigned long len)
 {
-	char *dst_kaddr = kmap_atomic(dst_page, KM_USER0);
+	char *dst_kaddr = page_address(dst_page);
 	if (dst_page == src_page) {
 		memmove(dst_kaddr + dst_off, dst_kaddr + src_off, len);
 	} else {
-		char *src_kaddr = kmap_atomic(src_page, KM_USER1);
+		char *src_kaddr = page_address(src_page);
 		char *p = dst_kaddr + dst_off + len;
 		char *s = src_kaddr + src_off + len;
 
 		while (len--)
 			*--p = *--s;
-
-		kunmap_atomic(src_kaddr, KM_USER1);
 	}
-	kunmap_atomic(dst_kaddr, KM_USER0);
 }
 
 static inline bool areas_overlap(unsigned long src, unsigned long dst, unsigned long len)
@@ -3735,20 +3697,17 @@ static void copy_pages(struct page *dst_page, struct page *src_page,
 		       unsigned long dst_off, unsigned long src_off,
 		       unsigned long len)
 {
-	char *dst_kaddr = kmap_atomic(dst_page, KM_USER0);
+	char *dst_kaddr = page_address(dst_page);
 	char *src_kaddr;
 
 	if (dst_page != src_page) {
-		src_kaddr = kmap_atomic(src_page, KM_USER1);
+		src_kaddr = page_address(src_page);
 	} else {
 		src_kaddr = dst_kaddr;
 		BUG_ON(areas_overlap(src_off, dst_off, len));
 	}
 
 	memcpy(dst_kaddr + dst_off, src_kaddr + src_off, len);
-	kunmap_atomic(dst_kaddr, KM_USER0);
-	if (dst_page != src_page)
-		kunmap_atomic(src_kaddr, KM_USER1);
 }
 
 void memcpy_extent_buffer(struct extent_buffer *dst, unsigned long dst_offset,

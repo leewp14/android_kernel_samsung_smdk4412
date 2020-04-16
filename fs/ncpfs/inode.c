@@ -44,7 +44,7 @@
 static void ncp_evict_inode(struct inode *);
 static void ncp_put_super(struct super_block *);
 static int  ncp_statfs(struct dentry *, struct kstatfs *);
-static int  ncp_show_options(struct seq_file *, struct vfsmount *);
+static int  ncp_show_options(struct seq_file *, struct dentry *);
 
 static struct kmem_cache * ncp_inode_cachep;
 
@@ -60,7 +60,6 @@ static struct inode *ncp_alloc_inode(struct super_block *sb)
 static void ncp_i_callback(struct rcu_head *head)
 {
 	struct inode *inode = container_of(head, struct inode, i_rcu);
-	INIT_LIST_HEAD(&inode->i_dentry);
 	kmem_cache_free(ncp_inode_cachep, NCP_FINFO(inode));
 }
 
@@ -228,7 +227,7 @@ static void ncp_set_attr(struct inode *inode, struct ncp_entry_info *nwinfo)
 
 	DDPRINTK("ncp_read_inode: inode->i_mode = %u\n", inode->i_mode);
 
-	inode->i_nlink = 1;
+	set_nlink(inode, 1);
 	inode->i_uid = server->m.uid;
 	inode->i_gid = server->m.gid;
 
@@ -323,9 +322,9 @@ static void ncp_stop_tasks(struct ncp_server *server) {
 		flush_work_sync(&server->timeout_tq);
 }
 
-static int  ncp_show_options(struct seq_file *seq, struct vfsmount *mnt)
+static int  ncp_show_options(struct seq_file *seq, struct dentry *root)
 {
-	struct ncp_server *server = NCP_SBP(mnt->mnt_sb);
+	struct ncp_server *server = NCP_SBP(root->d_sb);
 	unsigned int tmp;
 
 	if (server->m.uid != 0)
@@ -717,13 +716,11 @@ static int ncp_fill_super(struct super_block *sb, void *raw_data, int silent)
         if (!root_inode)
 		goto out_disconnect;
 	DPRINTK("ncp_fill_super: root vol=%d\n", NCP_FINFO(root_inode)->volNumber);
-	sb->s_root = d_alloc_root(root_inode);
+	sb->s_root = d_make_root(root_inode);
         if (!sb->s_root)
-		goto out_no_root;
+		goto out_disconnect;
 	return 0;
 
-out_no_root:
-	iput(root_inode);
 out_disconnect:
 	ncp_lock_server(server);
 	ncp_disconnect(server);
@@ -1041,6 +1038,7 @@ static struct file_system_type ncp_fs_type = {
 	.kill_sb	= kill_anon_super,
 	.fs_flags	= FS_BINARY_MOUNTDATA,
 };
+MODULE_ALIAS_FS("ncpfs");
 
 static int __init init_ncp_fs(void)
 {

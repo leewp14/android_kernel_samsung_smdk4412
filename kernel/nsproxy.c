@@ -66,7 +66,7 @@ static struct nsproxy *create_new_namespaces(unsigned long flags,
 	if (!new_nsp)
 		return ERR_PTR(-ENOMEM);
 
-	new_nsp->mnt_ns = copy_mnt_ns(flags, tsk->nsproxy->mnt_ns, new_fs);
+	new_nsp->mnt_ns = copy_mnt_ns(flags, tsk->nsproxy->mnt_ns, task_cred_xxx(tsk, user_ns), new_fs);
 	if (IS_ERR(new_nsp->mnt_ns)) {
 		err = PTR_ERR(new_nsp->mnt_ns);
 		goto out_ns;
@@ -122,6 +122,7 @@ out_ns:
 int copy_namespaces(unsigned long flags, struct task_struct *tsk)
 {
 	struct nsproxy *old_ns = tsk->nsproxy;
+	struct user_namespace *user_ns = task_cred_xxx(tsk, user_ns);
 	struct nsproxy *new_ns;
 	int err = 0;
 
@@ -134,7 +135,7 @@ int copy_namespaces(unsigned long flags, struct task_struct *tsk)
 				CLONE_NEWPID | CLONE_NEWNET)))
 		return 0;
 
-	if (!capable(CAP_SYS_ADMIN)) {
+	if (!ns_capable(user_ns, CAP_SYS_ADMIN)) {
 		err = -EPERM;
 		goto out;
 	}
@@ -191,7 +192,7 @@ int unshare_nsproxy_namespaces(unsigned long unshare_flags,
 			       CLONE_NEWNET)))
 		return 0;
 
-	if (!capable(CAP_SYS_ADMIN))
+	if (!nsown_capable(CAP_SYS_ADMIN))
 		return -EPERM;
 
 	*new_nsp = create_new_namespaces(unshare_flags, current,
@@ -240,9 +241,6 @@ SYSCALL_DEFINE2(setns, int, fd, int, nstype)
 	struct proc_inode *ei;
 	struct file *file;
 	int err;
-
-	if (!capable(CAP_SYS_ADMIN))
-		return -EPERM;
 
 	file = proc_ns_fget(fd);
 	if (IS_ERR(file))

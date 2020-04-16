@@ -26,10 +26,10 @@
 #include <plat/regs-dsim.h>
 #include <mach/dsim.h>
 #include <mach/mipi_ddi.h>
-#ifdef CONFIG_HAS_EARLYSUSPEND
-#include <linux/earlysuspend.h>
+#ifdef CONFIG_FB
+#include <linux/notifier.h>
+#include <linux/fb.h>
 #endif
-
 #include "s5p-dsim.h"
 #include "s3cfb.h"
 #include "ea8061_param.h"
@@ -112,8 +112,8 @@ static unsigned int aid_candela_table[GAMMA_MAX] = {
 };
 #endif
 
-extern void (*lcd_early_suspend)(void);
-extern void (*lcd_late_resume)(void);
+extern void (*lcd_fb_suspend)(void);
+extern void (*lcd_fb_resume)(void);
 
 #if defined(GPIO_ERR_FG)
 static void err_fg_detection_work(struct work_struct *work)
@@ -489,9 +489,8 @@ elvss_err:
 
 static int init_elvss_table(struct lcd_info *lcd)
 {
-	int i, ret = 0;
 #ifdef SMART_DIMMING_DEBUG
-	int j;
+	int i, j;
 #endif
 	lcd->elvss_table = (unsigned char **)ELVSS_CONTROL_TABLE;
 
@@ -504,15 +503,6 @@ static int init_elvss_table(struct lcd_info *lcd)
 #endif
 
 	return 0;
-
-err_alloc_elvss:
-	while (i > 0) {
-		kfree(lcd->elvss_table[i-1]);
-		i--;
-	}
-	kfree(lcd->elvss_table);
-err_alloc_elvss_table:
-	return ret;
 }
 
 #ifdef SMART_DIMMING
@@ -725,6 +715,8 @@ static int ea8061_ldi_init(struct lcd_info *lcd)
 	ea8061_write(lcd, SEQ_APPLY_LEVEL_2_KEY_ENABLE, ARRAY_SIZE(SEQ_APPLY_LEVEL_2_KEY_ENABLE));
 	ea8061_write(lcd, SEQ_APPLY_LEVEL_3_KEY, ARRAY_SIZE(SEQ_APPLY_LEVEL_3_KEY));
 	if (lcd->id[1] == 0x13) {  /* M4 */
+		ea8061_write(lcd, SEQ_MAGNA_GP, ARRAY_SIZE(SEQ_MAGNA_GP));
+		ea8061_write(lcd, SEQ_MAGNA_REFRESH_DISABLE, ARRAY_SIZE(SEQ_MAGNA_REFRESH_DISABLE));
 		ea8061_write(lcd, SEQ_M4_PANEL_CONDITION_SET, ARRAY_SIZE(SEQ_M4_PANEL_CONDITION_SET));
 		ea8061_write(lcd, SEQ_DISPLAY_CONDITION_SET, ARRAY_SIZE(SEQ_DISPLAY_CONDITION_SET));
 /*		ea8061_write(lcd, SEQ_FRAME_GAMMA_UPDATE_KEY, ARRAY_SIZE(SEQ_FRAME_GAMMA_UPDATE_KEY));
@@ -736,6 +728,8 @@ static int ea8061_ldi_init(struct lcd_info *lcd)
 		ea8061_write(lcd, SEQ_ETC_WCABC_CONTROL, ARRAY_SIZE(SEQ_ETC_WCABC_CONTROL));
 		ea8061_write(lcd, SEQ_M4_SLEW, ARRAY_SIZE(SEQ_M4_SLEW));
 	} else {  /* SM2 */
+		ea8061_write(lcd, SEQ_MAGNA_GP, ARRAY_SIZE(SEQ_MAGNA_GP));
+		ea8061_write(lcd, SEQ_MAGNA_REFRESH_DISABLE, ARRAY_SIZE(SEQ_MAGNA_REFRESH_DISABLE));
 		ea8061_write(lcd, SEQ_PANEL_CONDITION_SET, ARRAY_SIZE(SEQ_PANEL_CONDITION_SET));
 		ea8061_write(lcd, SEQ_DISPLAY_CONDITION_SET, ARRAY_SIZE(SEQ_DISPLAY_CONDITION_SET));
 /*		ea8061_write(lcd, SEQ_FRAME_GAMMA_UPDATE_KEY, ARRAY_SIZE(SEQ_FRAME_GAMMA_UPDATE_KEY));
@@ -892,10 +886,9 @@ static int ea8061_get_brightness(struct backlight_device *bd)
 
 static int ea8061_check_fb(struct lcd_device *ld, struct fb_info *fb)
 {
-	struct s3cfb_window *win = fb->par;
 	struct lcd_info *lcd = lcd_get_data(ld);
 
-	//dev_info(&lcd->ld->dev, "%s, fb%d\n", __func__, win->id);
+	dev_info(&lcd->ld->dev, "%s, fb%d\n", __func__, fb->node);
 
 	return 0;
 }
@@ -1036,7 +1029,7 @@ static DEVICE_ATTR(auto_brightness, 0644, auto_brightness_show, auto_brightness_
 #ifdef CONFIG_HAS_EARLYSUSPEND
 static struct lcd_info *g_lcd;
 
-void ea8061_early_suspend(void)
+void ea8061_fb_suspend(void)
 {
 	struct lcd_info *lcd = g_lcd;
 
@@ -1059,7 +1052,7 @@ void ea8061_early_suspend(void)
 	return ;
 }
 
-void ea8061_late_resume(void)
+void ea8061_fb_resume(void)
 {
 	struct lcd_info *lcd = g_lcd;
 
@@ -1075,6 +1068,8 @@ void ea8061_late_resume(void)
 	dev_info(&lcd->ld->dev, "-%s\n", __func__);
 
 	set_dsim_lcd_enabled(1);
+
+	lcd->fb_suspended = false;
 
 	return ;
 }
@@ -1153,6 +1148,7 @@ static int ea8061_probe(struct device *dev)
 	lcd->ldi_enable = 1;
 	lcd->connected = 1;
 	lcd->auto_brightness = 0;
+	lcd->fb_suspended = false;
 
 	ret = device_create_file(&lcd->ld->dev, &dev_attr_power_reduce);
 	if (ret < 0)
@@ -1228,8 +1224,8 @@ static int ea8061_probe(struct device *dev)
 	}
 #endif
 
-	lcd_early_suspend = ea8061_early_suspend;
-	lcd_late_resume = ea8061_late_resume;
+	lcd_fb_suspend = ea8061_fb_suspend;
+	lcd_fb_resume = ea8061_fb_resume;
 
 	return 0;
 

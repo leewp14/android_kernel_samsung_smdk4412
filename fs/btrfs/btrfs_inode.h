@@ -100,20 +100,12 @@ struct btrfs_inode {
 	 */
 	u64 delalloc_bytes;
 
-	/* total number of bytes that may be used for this inode for
-	 * delalloc
-	 */
-	u64 reserved_bytes;
-
 	/*
 	 * the size of the file stored in the metadata on disk.  data=ordered
 	 * means the in-memory i_size might be larger than the size on disk
 	 * because not all the blocks are written yet.
 	 */
 	u64 disk_i_size;
-
-	/* flags field from the on disk inode */
-	u32 flags;
 
 	/*
 	 * if this is a directory then index_cnt is the counter for the index
@@ -127,6 +119,9 @@ struct btrfs_inode {
 	 * details
 	 */
 	u64 last_unlink_trans;
+
+	/* flags field from the on disk inode */
+	u32 flags;
 
 	/*
 	 * Counters to keep track of the number of extent item's we may use due
@@ -182,6 +177,15 @@ static inline void btrfs_i_size_write(struct inode *inode, u64 size)
 {
 	i_size_write(inode, size);
 	BTRFS_I(inode)->disk_i_size = size;
+}
+
+static inline bool btrfs_is_free_space_inode(struct btrfs_root *root,
+				       struct inode *inode)
+{
+	if (root == root->fs_info->tree_root ||
+	    BTRFS_I(inode)->location.objectid == BTRFS_FREE_INO_OBJECTID)
+		return true;
+	return false;
 }
 
 #endif

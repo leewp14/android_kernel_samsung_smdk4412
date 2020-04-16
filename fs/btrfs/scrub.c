@@ -101,6 +101,7 @@ struct scrub_dev {
 };
 
 static void scrub_free_csums(struct scrub_dev *sdev)
+
 {
 	while (!list_empty(&sdev->csum_list)) {
 		struct btrfs_ordered_sum *sum;
@@ -182,7 +183,7 @@ struct scrub_dev *scrub_setup_dev(struct btrfs_device *dev)
 	sdev->curr = -1;
 	atomic_set(&sdev->in_flight, 0);
 	atomic_set(&sdev->cancel_req, 0);
-	sdev->csum_size = btrfs_super_csum_size(&fs_info->super_copy);
+	sdev->csum_size = btrfs_super_csum_size(fs_info->super_copy);
 	INIT_LIST_HEAD(&sdev->csum_list);
 
 	spin_lock_init(&sdev->list_lock);
@@ -193,6 +194,7 @@ struct scrub_dev *scrub_setup_dev(struct btrfs_device *dev)
 nomem:
 	scrub_free_dev(sdev);
 	return ERR_PTR(-ENOMEM);
+
 }
 
 /*

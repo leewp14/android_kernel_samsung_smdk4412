@@ -165,7 +165,6 @@ static void
 rpc_i_callback(struct rcu_head *head)
 {
 	struct inode *inode = container_of(head, struct inode, i_rcu);
-	INIT_LIST_HEAD(&inode->i_dentry);
 	kmem_cache_free(rpc_inode_cachep, RPC_I(inode));
 }
 
@@ -1014,13 +1013,9 @@ rpc_fill_super(struct super_block *sb, void *data, int silent)
 	sb->s_time_gran = 1;
 
 	inode = rpc_get_inode(sb, S_IFDIR | 0755);
-	if (!inode)
+	sb->s_root = root = d_make_root(inode);
+	if (!root)
 		return -ENOMEM;
-	sb->s_root = root = d_alloc_root(inode);
-	if (!root) {
-		iput(inode);
-		return -ENOMEM;
-	}
 	if (rpc_populate(root, files, RPCAUTH_lockd, RPCAUTH_RootEOF, NULL))
 		return -ENOMEM;
 	return 0;
@@ -1039,6 +1034,7 @@ static struct file_system_type rpc_pipe_fs_type = {
 	.mount		= rpc_mount,
 	.kill_sb	= kill_litter_super,
 };
+MODULE_ALIAS_FS("rpc_pipefs");
 
 static void
 init_once(void *foo)

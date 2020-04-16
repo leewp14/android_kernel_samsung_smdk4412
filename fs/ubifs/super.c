@@ -129,7 +129,7 @@ struct inode *ubifs_iget(struct super_block *sb, unsigned long inum)
 		goto out_ino;
 
 	inode->i_flags |= (S_NOCMTIME | S_NOATIME);
-	inode->i_nlink = le32_to_cpu(ino->nlink);
+	set_nlink(inode, le32_to_cpu(ino->nlink));
 	inode->i_uid   = le32_to_cpu(ino->uid);
 	inode->i_gid   = le32_to_cpu(ino->gid);
 	inode->i_atime.tv_sec  = (int64_t)le64_to_cpu(ino->atime_sec);
@@ -276,7 +276,6 @@ static void ubifs_i_callback(struct rcu_head *head)
 {
 	struct inode *inode = container_of(head, struct inode, i_rcu);
 	struct ubifs_inode *ui = ubifs_inode(inode);
-	INIT_LIST_HEAD(&inode->i_dentry);
 	kmem_cache_free(ubifs_inode_slab, ui);
 }
 
@@ -420,9 +419,9 @@ static int ubifs_statfs(struct dentry *dentry, struct kstatfs *buf)
 	return 0;
 }
 
-static int ubifs_show_options(struct seq_file *s, struct vfsmount *mnt)
+static int ubifs_show_options(struct seq_file *s, struct dentry *root)
 {
-	struct ubifs_info *c = mnt->mnt_sb->s_fs_info;
+	struct ubifs_info *c = root->d_sb->s_fs_info;
 
 	if (c->mount_opts.unmount_mode == 2)
 		seq_printf(s, ",fast_unmount");
@@ -2077,15 +2076,13 @@ static int ubifs_fill_super(struct super_block *sb, void *data, int silent)
 		goto out_umount;
 	}
 
-	sb->s_root = d_alloc_root(root);
+	sb->s_root = d_make_root(root);
 	if (!sb->s_root)
-		goto out_iput;
+		goto out_umount;
 
 	mutex_unlock(&c->umount_mutex);
 	return 0;
 
-out_iput:
-	iput(root);
 out_umount:
 	ubifs_umount(c);
 out_unlock:
@@ -2192,6 +2189,7 @@ static struct file_system_type ubifs_fs_type = {
 	.mount   = ubifs_mount,
 	.kill_sb = kill_ubifs_super,
 };
+MODULE_ALIAS_FS("ubifs");
 
 /*
  * Inode slab cache constructor.

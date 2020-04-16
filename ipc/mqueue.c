@@ -188,30 +188,20 @@ static int mqueue_fill_super(struct super_block *sb, void *data, int silent)
 {
 	struct inode *inode;
 	struct ipc_namespace *ns = data;
-	int error;
 
 	sb->s_blocksize = PAGE_CACHE_SIZE;
 	sb->s_blocksize_bits = PAGE_CACHE_SHIFT;
 	sb->s_magic = MQUEUE_MAGIC;
 	sb->s_op = &mqueue_super_ops;
 
-	inode = mqueue_get_inode(sb, ns, S_IFDIR | S_ISVTX | S_IRWXUGO,
-				NULL);
-	if (IS_ERR(inode)) {
-		error = PTR_ERR(inode);
-		goto out;
-	}
+	inode = mqueue_get_inode(sb, ns, S_IFDIR | S_ISVTX | S_IRWXUGO, NULL);
+	if (IS_ERR(inode))
+		return PTR_ERR(inode);
 
-	sb->s_root = d_alloc_root(inode);
-	if (!sb->s_root) {
-		iput(inode);
-		error = -ENOMEM;
-		goto out;
-	}
-	error = 0;
-
-out:
-	return error;
+	sb->s_root = d_make_root(inode);
+	if (!sb->s_root)
+		return -ENOMEM;
+	return 0;
 }
 
 static struct dentry *mqueue_mount(struct file_system_type *fs_type,
@@ -243,7 +233,6 @@ static struct inode *mqueue_alloc_inode(struct super_block *sb)
 static void mqueue_i_callback(struct rcu_head *head)
 {
 	struct inode *inode = container_of(head, struct inode, i_rcu);
-	INIT_LIST_HEAD(&inode->i_dentry);
 	kmem_cache_free(mqueue_inode_cachep, MQUEUE_I(inode));
 }
 
@@ -296,7 +285,7 @@ static void mqueue_evict_inode(struct inode *inode)
 }
 
 static int mqueue_create(struct inode *dir, struct dentry *dentry,
-				int mode, struct nameidata *nd)
+				umode_t mode, struct nameidata *nd)
 {
 	struct inode *inode;
 	struct mq_attr *attr = dentry->d_fsdata;
@@ -611,7 +600,7 @@ static int mq_attr_ok(struct ipc_namespace *ipc_ns, struct mq_attr *attr)
  * Invoked when creating a new queue via sys_mq_open
  */
 static struct file *do_create(struct ipc_namespace *ipc_ns, struct dentry *dir,
-			struct dentry *dentry, int oflag, mode_t mode,
+			struct dentry *dentry, int oflag, umode_t mode,
 			struct mq_attr *attr)
 {
 	const struct cred *cred = current_cred();
@@ -631,7 +620,7 @@ static struct file *do_create(struct ipc_namespace *ipc_ns, struct dentry *dir,
 	ret = mnt_want_write(ipc_ns->mq_mnt);
 	if (ret)
 		goto out;
-	ret = vfs_create(dir->d_inode, dentry, mode, NULL);
+	ret = vfs_create2(ipc_ns->mq_mnt, dir->d_inode, dentry, mode, NULL);
 	dentry->d_fsdata = NULL;
 	if (ret)
 		goto out_drop_write;
@@ -667,7 +656,7 @@ static struct file *do_open(struct ipc_namespace *ipc_ns,
 		goto err;
 	}
 
-	if (inode_permission(dentry->d_inode, oflag2acc[oflag & O_ACCMODE])) {
+	if (inode_permission2(ipc_ns->mq_mnt, dentry->d_inode, oflag2acc[oflag & O_ACCMODE])) {
 		ret = -EACCES;
 		goto err;
 	}
@@ -703,7 +692,7 @@ SYSCALL_DEFINE4(mq_open, const char __user *, u_name, int, oflag, mode_t, mode,
 		goto out_putname;
 
 	mutex_lock(&ipc_ns->mq_mnt->mnt_root->d_inode->i_mutex);
-	dentry = lookup_one_len(name, ipc_ns->mq_mnt->mnt_root, strlen(name));
+	dentry = lookup_one_len2(name, ipc_ns->mq_mnt, ipc_ns->mq_mnt->mnt_root, strlen(name));
 	if (IS_ERR(dentry)) {
 		error = PTR_ERR(dentry);
 		goto out_putfd;
@@ -767,7 +756,8 @@ SYSCALL_DEFINE1(mq_unlink, const char __user *, u_name)
 
 	mutex_lock_nested(&ipc_ns->mq_mnt->mnt_root->d_inode->i_mutex,
 			I_MUTEX_PARENT);
-	dentry = lookup_one_len(name, ipc_ns->mq_mnt->mnt_root, strlen(name));
+	dentry = lookup_one_len2(name, ipc_ns->mq_mnt, ipc_ns->mq_mnt->mnt_root,
+			       strlen(name));
 	if (IS_ERR(dentry)) {
 		err = PTR_ERR(dentry);
 		goto out_unlock;
@@ -784,7 +774,7 @@ SYSCALL_DEFINE1(mq_unlink, const char __user *, u_name)
 	err = mnt_want_write(ipc_ns->mq_mnt);
 	if (err)
 		goto out_err;
-	err = vfs_unlink(dentry->d_parent->d_inode, dentry);
+	err = vfs_unlink2(ipc_ns->mq_mnt, dentry->d_parent->d_inode, dentry);
 	mnt_drop_write(ipc_ns->mq_mnt);
 out_err:
 	dput(dentry);

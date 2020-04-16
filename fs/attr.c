@@ -5,7 +5,7 @@
  *  changes by Thomas Schoebel-Theuer
  */
 
-#include <linux/module.h>
+#include <linux/export.h>
 #include <linux/time.h>
 #include <linux/mm.h>
 #include <linux/string.h>
@@ -162,7 +162,7 @@ void setattr_copy(struct inode *inode, const struct iattr *attr)
 }
 EXPORT_SYMBOL(setattr_copy);
 
-int notify_change(struct dentry * dentry, struct iattr * attr)
+int notify_change2(struct vfsmount *mnt, struct dentry * dentry, struct iattr * attr)
 {
 	struct inode *inode = dentry->d_inode;
 	mode_t mode = inode->i_mode;
@@ -173,6 +173,11 @@ int notify_change(struct dentry * dentry, struct iattr * attr)
 	if (ia_valid & (ATTR_MODE | ATTR_UID | ATTR_GID | ATTR_TIMES_SET)) {
 		if (IS_IMMUTABLE(inode) || IS_APPEND(inode))
 			return -EPERM;
+	}
+
+	if ((ia_valid & ATTR_SIZE) && IS_I_VERSION(inode)) {
+		if (attr->ia_size != inode->i_size)
+			inode_inc_iversion(inode);
 	}
 
 	if ((ia_valid & ATTR_MODE)) {
@@ -232,21 +237,22 @@ int notify_change(struct dentry * dentry, struct iattr * attr)
 	if (error)
 		return error;
 
-	if (ia_valid & ATTR_SIZE)
-		down_write(&dentry->d_inode->i_alloc_sem);
-
-	if (inode->i_op->setattr)
+	if (mnt && inode->i_op->setattr2)
+		error = inode->i_op->setattr2(mnt, dentry, attr);
+	else if (inode->i_op->setattr)
 		error = inode->i_op->setattr(dentry, attr);
 	else
 		error = simple_setattr(dentry, attr);
-
-	if (ia_valid & ATTR_SIZE)
-		up_write(&dentry->d_inode->i_alloc_sem);
 
 	if (!error)
 		fsnotify_change(dentry, ia_valid);
 
 	return error;
 }
+EXPORT_SYMBOL(notify_change2);
 
+int notify_change(struct dentry * dentry, struct iattr * attr)
+{
+	return notify_change2(NULL, dentry, attr);
+}
 EXPORT_SYMBOL(notify_change);

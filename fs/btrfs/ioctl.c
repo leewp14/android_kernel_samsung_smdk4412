@@ -253,7 +253,7 @@ static int btrfs_ioctl_setflags(struct file *file, void __user *arg)
 	inode->i_ctime = CURRENT_TIME;
 	btrfs_end_transaction(trans, root);
 
-	mnt_drop_write(file->f_path.mnt);
+	mnt_drop_write_file(file);
 
 	ret = 0;
  out_unlock:
@@ -270,13 +270,13 @@ static int btrfs_ioctl_getversion(struct file *file, int __user *arg)
 
 static noinline int btrfs_ioctl_fitrim(struct file *file, void __user *arg)
 {
-	struct btrfs_root *root = fdentry(file)->d_sb->s_fs_info;
-	struct btrfs_fs_info *fs_info = root->fs_info;
+	struct btrfs_fs_info *fs_info = btrfs_sb(fdentry(file)->d_sb);
 	struct btrfs_device *device;
 	struct request_queue *q;
 	struct fstrim_range range;
 	u64 minlen = ULLONG_MAX;
 	u64 num_devices = 0;
+	u64 total_bytes = btrfs_super_total_bytes(fs_info->super_copy);
 	int ret;
 
 	if (!capable(CAP_SYS_ADMIN))
@@ -295,14 +295,17 @@ static noinline int btrfs_ioctl_fitrim(struct file *file, void __user *arg)
 		}
 	}
 	rcu_read_unlock();
+
 	if (!num_devices)
 		return -EOPNOTSUPP;
-
 	if (copy_from_user(&range, arg, sizeof(range)))
 		return -EFAULT;
+	if (range.start > total_bytes)
+		return -EINVAL;
 
+	range.len = min(range.len, total_bytes - range.start);
 	range.minlen = max(range.minlen, minlen);
-	ret = btrfs_trim_fs(root, &range);
+	ret = btrfs_trim_fs(fs_info->tree_root, &range);
 	if (ret < 0)
 		return ret;
 
@@ -1133,7 +1136,7 @@ int btrfs_defrag_file(struct inode *inode, struct file *file,
 		mutex_unlock(&inode->i_mutex);
 	}
 
-	disk_super = &root->fs_info->super_copy;
+	disk_super = root->fs_info->super_copy;
 	features = btrfs_super_incompat_flags(disk_super);
 	if (range->compress_type == BTRFS_COMPRESS_LZO) {
 		features |= BTRFS_FEATURE_INCOMPAT_COMPRESS_LZO;
@@ -1940,7 +1943,7 @@ out_dput:
 	dput(dentry);
 out_unlock_dir:
 	mutex_unlock(&dir->i_mutex);
-	mnt_drop_write(file->f_path.mnt);
+	mnt_drop_write_file(file);
 out:
 	kfree(vol_args);
 	return err;
@@ -2009,7 +2012,7 @@ static int btrfs_ioctl_defrag(struct file *file, void __user *argp)
 		ret = -EINVAL;
 	}
 out:
-	mnt_drop_write(file->f_path.mnt);
+	mnt_drop_write_file(file);
 	return ret;
 }
 
@@ -2453,7 +2456,7 @@ out_unlock:
 out_fput:
 	fput(src_file);
 out_drop_write:
-	mnt_drop_write(file->f_path.mnt);
+	mnt_drop_write_file(file);
 	return ret;
 }
 
@@ -2508,7 +2511,7 @@ static long btrfs_ioctl_trans_start(struct file *file)
 
 out_drop:
 	atomic_dec(&root->fs_info->open_ioctl_trans);
-	mnt_drop_write(file->f_path.mnt);
+	mnt_drop_write_file(file);
 out:
 	return ret;
 }
@@ -2559,7 +2562,7 @@ static long btrfs_ioctl_default_subvol(struct file *file, void __user *argp)
 		return PTR_ERR(trans);
 	}
 
-	dir_id = btrfs_super_root_dir(&root->fs_info->super_copy);
+	dir_id = btrfs_super_root_dir(root->fs_info->super_copy);
 	di = btrfs_lookup_dir_item(trans, root->fs_info->tree_root, path,
 				   dir_id, "default", 7, 1);
 	if (IS_ERR_OR_NULL(di)) {
@@ -2575,7 +2578,7 @@ static long btrfs_ioctl_default_subvol(struct file *file, void __user *argp)
 	btrfs_mark_buffer_dirty(path->nodes[0]);
 	btrfs_free_path(path);
 
-	disk_super = &root->fs_info->super_copy;
+	disk_super = root->fs_info->super_copy;
 	features = btrfs_super_incompat_flags(disk_super);
 	if (!(features & BTRFS_FEATURE_INCOMPAT_DEFAULT_SUBVOL)) {
 		features |= BTRFS_FEATURE_INCOMPAT_DEFAULT_SUBVOL;
@@ -2743,7 +2746,7 @@ long btrfs_ioctl_trans_end(struct file *file)
 
 	atomic_dec(&root->fs_info->open_ioctl_trans);
 
-	mnt_drop_write(file->f_path.mnt);
+	mnt_drop_write_file(file);
 	return 0;
 }
 

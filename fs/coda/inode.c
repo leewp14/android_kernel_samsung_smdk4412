@@ -58,7 +58,6 @@ static struct inode *coda_alloc_inode(struct super_block *sb)
 static void coda_i_callback(struct rcu_head *head)
 {
 	struct inode *inode = container_of(head, struct inode, i_rcu);
-	INIT_LIST_HEAD(&inode->i_dentry);
 	kmem_cache_free(coda_inode_cachep, ITOC(inode));
 }
 
@@ -205,15 +204,16 @@ static int coda_fill_super(struct super_block *sb, void *data, int silent)
 	printk("coda_read_super: rootfid is %s\n", coda_f2s(&fid));
 	
 	/* make root inode */
-        error = coda_cnode_make(&root, &fid, sb);
-        if ( error || !root ) {
-	    printk("Failure of coda_cnode_make for root: error %d\n", error);
-	    goto error;
+        root = coda_cnode_make(&fid, sb);
+        if (IS_ERR(root)) {
+		error = PTR_ERR(root);
+		printk("Failure of coda_cnode_make for root: error %d\n", error);
+		goto error;
 	} 
 
 	printk("coda_read_super: rootinode is %ld dev %s\n", 
 	       root->i_ino, root->i_sb->s_id);
-	sb->s_root = d_alloc_root(root);
+	sb->s_root = d_make_root(root);
 	if (!sb->s_root) {
 		error = -EINVAL;
 		goto error;
@@ -221,9 +221,6 @@ static int coda_fill_super(struct super_block *sb, void *data, int silent)
 	return 0;
 
 error:
-	if (root)
-		iput(root);
-
 	mutex_lock(&vc->vc_mutex);
 	bdi_destroy(&vc->bdi);
 	vc->vc_sb = NULL;
@@ -326,4 +323,5 @@ struct file_system_type coda_fs_type = {
 	.kill_sb	= kill_anon_super,
 	.fs_flags	= FS_BINARY_MOUNTDATA,
 };
+MODULE_ALIAS_FS("coda");
 

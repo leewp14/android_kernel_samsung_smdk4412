@@ -67,6 +67,9 @@
 #define MTP_RESPONSE_OK             0x2001
 #define MTP_RESPONSE_DEVICE_BUSY    0x2019
 
+unsigned int mtp_rx_req_len = MTP_BULK_BUFFER_SIZE;
+module_param(mtp_rx_req_len, uint, S_IRUGO | S_IWUSR);
+
 static const char mtp_shortname[] = "mtp_usb";
 
 struct mtp_dev {
@@ -467,15 +470,6 @@ static int mtp_create_bulk_endpoints(struct mtp_dev *dev,
 	ep->driver_data = dev;		/* claim the endpoint */
 	dev->ep_out = ep;
 
-	ep = usb_ep_autoconfig(cdev->gadget, out_desc);
-	if (!ep) {
-		DBG(cdev, "usb_ep_autoconfig for ep_out failed\n");
-		return -ENODEV;
-	}
-	DBG(cdev, "usb_ep_autoconfig for mtp ep_out got %s\n", ep->name);
-	ep->driver_data = dev;		/* claim the endpoint */
-	dev->ep_out = ep;
-
 	ep = usb_ep_autoconfig(cdev->gadget, intr_desc);
 	if (!ep) {
 		DBG(cdev, "usb_ep_autoconfig for ep_intr failed\n");
@@ -493,10 +487,17 @@ static int mtp_create_bulk_endpoints(struct mtp_dev *dev,
 		req->complete = mtp_complete_in;
 		mtp_req_put(dev, &dev->tx_idle, req);
 	}
+retry_rx_alloc:
 	for (i = 0; i < RX_REQ_MAX; i++) {
-		req = mtp_request_new(dev->ep_out, MTP_BULK_BUFFER_SIZE);
-		if (!req)
-			goto fail;
+		req = mtp_request_new(dev->ep_out, mtp_rx_req_len);
+		if (!req) {
+			if (mtp_rx_req_len <= MTP_BULK_BUFFER_SIZE)
+				goto fail;
+			for (; i > 0; i--)
+				mtp_request_free(dev->rx_req[i], dev->ep_out);
+			mtp_rx_req_len = MTP_BULK_BUFFER_SIZE;
+			goto retry_rx_alloc;
+		}
 		req->complete = mtp_complete_out;
 		dev->rx_req[i] = req;
 	}
@@ -526,7 +527,7 @@ static ssize_t mtp_read(struct file *fp, char __user *buf,
 
 	DBG(cdev, "mtp_read(%d)\n", count);
 
-	if (count > MTP_BULK_BUFFER_SIZE)
+	if (count > mtp_rx_req_len)
 		return -EINVAL;
 
 	/* we will block until we're online */
@@ -561,7 +562,17 @@ requeue_req:
 	}
 
 	/* wait for a request to complete */
-	ret = wait_event_interruptible(dev->read_wq, dev->rx_done);
+	ret = wait_event_interruptible(dev->read_wq,
+				dev->rx_done || dev->state != STATE_BUSY);
+	if (dev->state == STATE_CANCELED) {
+		r = -ECANCELED;
+		if (!dev->rx_done)
+			usb_ep_dequeue(dev->ep_out, req);
+		spin_lock_irq(&dev->lock);
+		dev->state = STATE_CANCELED;
+		spin_unlock_irq(&dev->lock);
+		goto done;
+	}
 	if (ret < 0) {
 		r = ret;
 		usb_ep_dequeue(dev->ep_out, req);
@@ -703,6 +714,11 @@ static void send_file_work(struct work_struct *data) {
 	offset = dev->xfer_file_offset;
 	count = dev->xfer_file_length;
 
+	if (count < 0) {
+		dev->xfer_result = -EINVAL;
+		return;
+	}
+
 	DBG(cdev, "send_file_work(%lld %lld)\n", offset, count);
 
 	if (dev->xfer_send_header) {
@@ -764,7 +780,8 @@ static void send_file_work(struct work_struct *data) {
 		ret = usb_ep_queue(dev->ep_in, req, GFP_KERNEL);
 		if (ret < 0) {
 			DBG(cdev, "send_file_work: xfer error %d\n", ret);
-			dev->state = STATE_ERROR;
+			if (dev->state != STATE_OFFLINE)
+				dev->state = STATE_ERROR;
 			r = -EIO;
 			break;
 		}
@@ -802,6 +819,11 @@ static void receive_file_work(struct work_struct *data)
 	offset = dev->xfer_file_offset;
 	count = dev->xfer_file_length;
 
+	if (count < 0) {
+		dev->xfer_result = -EINVAL;
+		return;
+	}
+
 	DBG(cdev, "receive_file_work(%lld)\n", count);
 
 	while (count > 0 || write_req) {
@@ -810,13 +832,14 @@ static void receive_file_work(struct work_struct *data)
 			read_req = dev->rx_req[cur_buf];
 			cur_buf = (cur_buf + 1) % RX_REQ_MAX;
 
-			read_req->length = (count > MTP_BULK_BUFFER_SIZE
-					? MTP_BULK_BUFFER_SIZE : count);
+			read_req->length = (count > mtp_rx_req_len
+					? mtp_rx_req_len : count);
 			dev->rx_done = 0;
 			ret = usb_ep_queue(dev->ep_out, read_req, GFP_KERNEL);
 			if (ret < 0) {
 				r = -EIO;
-				dev->state = STATE_ERROR;
+				if (dev->state != STATE_OFFLINE)
+					dev->state = STATE_ERROR;
 				break;
 			}
 		}
@@ -828,7 +851,8 @@ static void receive_file_work(struct work_struct *data)
 			DBG(cdev, "vfs_write %d\n", ret);
 			if (ret != write_req->actual) {
 				r = -EIO;
-				dev->state = STATE_ERROR;
+				if (dev->state != STATE_OFFLINE)
+					dev->state = STATE_ERROR;
 				break;
 			}
 			write_req = NULL;
@@ -1144,6 +1168,7 @@ mtp_function_bind(struct usb_configuration *c, struct usb_function *f)
 	if (id < 0)
 		return id;
 	mtp_interface_desc.bInterfaceNumber = id;
+	mtp_ext_config_desc.function.bFirstInterfaceNumber = id;
 
 	/* allocate endpoints */
 	ret = mtp_create_bulk_endpoints(dev, &mtp_fullspeed_in_desc,

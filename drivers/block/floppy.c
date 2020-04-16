@@ -188,7 +188,6 @@ static int print_unex = 1;
 #include <linux/init.h>
 #include <linux/platform_device.h>
 #include <linux/mod_devicetable.h>
-#include <linux/buffer_head.h>	/* for invalidate_buffers() */
 #include <linux/mutex.h>
 #include <linux/io.h>
 #include <linux/uaccess.h>
@@ -3795,9 +3794,9 @@ static int __floppy_read_block_0(struct block_device *bdev)
 	bio_vec.bv_offset = 0;
 	bio.bi_vcnt = 1;
 	bio.bi_idx = 0;
-	bio.bi_size = size;
+	bio->bi_iter.bi_size = size;
 	bio.bi_bdev = bdev;
-	bio.bi_sector = 0;
+	bio->bi_iter.bi_sector = 0;
 	bio.bi_flags = BIO_QUIET;
 	init_completion(&complete);
 	bio.bi_private = &complete;

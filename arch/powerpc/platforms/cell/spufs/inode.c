@@ -74,7 +74,6 @@ spufs_alloc_inode(struct super_block *sb)
 static void spufs_i_callback(struct rcu_head *head)
 {
 	struct inode *inode = container_of(head, struct inode, i_rcu);
-	INIT_LIST_HEAD(&inode->i_dentry);
 	kmem_cache_free(spufs_inode_cache, SPUFS_I(inode));
 }
 
@@ -165,7 +164,7 @@ static void spufs_prune_dir(struct dentry *dir)
 	struct dentry *dentry, *tmp;
 
 	mutex_lock(&dir->d_inode->i_mutex);
-	list_for_each_entry_safe(dentry, tmp, &dir->d_subdirs, d_u.d_child) {
+	list_for_each_entry_safe(dentry, tmp, &dir->d_subdirs, d_child) {
 		spin_lock(&dentry->d_lock);
 		if (!(d_unhashed(dentry)) && dentry->d_inode) {
 			dget_dlock(dentry);
@@ -223,7 +222,7 @@ out:
 	 * - free child's inode if possible
 	 * - free child
 	 */
-	list_for_each_entry_safe(dentry, tmp, &dir->d_subdirs, d_u.d_child) {
+	list_for_each_entry_safe(dentry, tmp, &dir->d_subdirs, d_child) {
 		dput(dentry);
 	}
 
@@ -766,9 +765,9 @@ spufs_create_root(struct super_block *sb, void *data)
 		goto out_iput;
 
 	ret = -ENOMEM;
-	sb->s_root = d_alloc_root(inode);
+	sb->s_root = d_make_root(inode);
 	if (!sb->s_root)
-		goto out_iput;
+		goto out;
 
 	return 0;
 out_iput:
@@ -818,6 +817,7 @@ static struct file_system_type spufs_type = {
 	.mount = spufs_mount,
 	.kill_sb = kill_litter_super,
 };
+MODULE_ALIAS_FS("spufs");
 
 static int __init spufs_init(void)
 {

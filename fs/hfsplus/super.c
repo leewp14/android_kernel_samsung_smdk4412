@@ -536,7 +536,6 @@ static void hfsplus_i_callback(struct rcu_head *head)
 {
 	struct inode *inode = container_of(head, struct inode, i_rcu);
 
-	INIT_LIST_HEAD(&inode->i_dentry);
 	kmem_cache_free(hfsplus_inode_cachep, HFSPLUS_I(inode));
 }
 
@@ -560,6 +559,7 @@ static struct file_system_type hfsplus_fs_type = {
 	.kill_sb	= kill_block_super,
 	.fs_flags	= FS_REQUIRES_DEV,
 };
+MODULE_ALIAS_FS("hfsplus");
 
 static void hfsplus_init_once(void *p)
 {

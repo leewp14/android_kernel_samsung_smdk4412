@@ -84,7 +84,6 @@ static struct inode *isofs_alloc_inode(struct super_block *sb)
 static void isofs_i_callback(struct rcu_head *head)
 {
 	struct inode *inode = container_of(head, struct inode, i_rcu);
-	INIT_LIST_HEAD(&inode->i_dentry);
 	kmem_cache_free(isofs_inode_cachep, ISOFS_I(inode));
 }
 
@@ -939,9 +938,11 @@ root_found:
 	s->s_d_op = &isofs_dentry_ops[table];
 
 	/* get the root dentry */
-	s->s_root = d_alloc_root(inode);
-	if (!(s->s_root))
-		goto out_no_root;
+	s->s_root = d_make_root(inode);
+	if (!(s->s_root)) {
+		error = -ENOMEM;
+		goto out_no_inode;
+	}
 
 	kfree(opt.iocharset);
 
@@ -1311,7 +1312,7 @@ static int isofs_read_inode(struct inode *inode)
 			inode->i_mode = S_IFDIR | sbi->s_dmode;
 		else
 			inode->i_mode = S_IFDIR | S_IRUGO | S_IXUGO;
-		inode->i_nlink = 1;	/*
+		set_nlink(inode, 1);	/*
 					 * Set to 1.  We know there are 2, but
 					 * the find utility tries to optimize
 					 * if it is 2, and it screws up.  It is
@@ -1329,7 +1330,7 @@ static int isofs_read_inode(struct inode *inode)
 			 */
 			inode->i_mode = S_IFREG | S_IRUGO | S_IXUGO;
 		}
-		inode->i_nlink = 1;
+		set_nlink(inode, 1);
 	}
 	inode->i_uid = sbi->s_uid;
 	inode->i_gid = sbi->s_gid;
@@ -1532,6 +1533,7 @@ static struct file_system_type iso9660_fs_type = {
 	.kill_sb	= kill_block_super,
 	.fs_flags	= FS_REQUIRES_DEV,
 };
+MODULE_ALIAS_FS("iso9660");
 
 static int __init init_iso9660_fs(void)
 {
@@ -1569,5 +1571,3 @@ static void __exit exit_iso9660_fs(void)
 module_init(init_iso9660_fs)
 module_exit(exit_iso9660_fs)
 MODULE_LICENSE("GPL");
-/* Actual filesystem name is iso9660, as requested in filesystems.c */
-MODULE_ALIAS("iso9660");

@@ -155,9 +155,8 @@ static struct dentry *v9fs_mount(struct file_system_type *fs_type, int flags,
 		goto release_sb;
 	}
 
-	root = d_alloc_root(inode);
+	root = d_make_root(inode);
 	if (!root) {
-		iput(inode);
 		retval = -ENOMEM;
 		goto release_sb;
 	}
@@ -366,3 +365,4 @@ struct file_system_type v9fs_fs_type = {
 	.owner = THIS_MODULE,
 	.fs_flags = FS_RENAME_DOES_D_MOVE|FS_REVAL_DOT,
 };
+MODULE_ALIAS_FS("9p");

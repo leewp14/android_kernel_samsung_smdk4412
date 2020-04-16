@@ -1112,7 +1112,7 @@ static inline u16 socket_type_to_security_class(int family, int type, int protoc
 			return SECCLASS_NETLINK_ROUTE_SOCKET;
 		case NETLINK_FIREWALL:
 			return SECCLASS_NETLINK_FIREWALL_SOCKET;
-		case NETLINK_INET_DIAG:
+		case NETLINK_SOCK_DIAG:
 			return SECCLASS_NETLINK_TCPDIAG_SOCKET;
 		case NETLINK_NFLOG:
 			return SECCLASS_NETLINK_NFLOG_SOCKET;
@@ -2588,16 +2588,16 @@ static int selinux_sb_statfs(struct dentry *dentry)
 	return superblock_has_perm(cred, dentry->d_sb, FILESYSTEM__GETATTR, &ad);
 }
 
-static int selinux_mount(char *dev_name,
+static int selinux_mount(const char *dev_name,
 			 struct path *path,
-			 char *type,
+			 const char *type,
 			 unsigned long flags,
 			 void *data)
 {
 	const struct cred *cred = current_cred();
 
 	if (flags & MS_REMOUNT)
-		return superblock_has_perm(cred, path->mnt->mnt_sb,
+		return superblock_has_perm(cred, path->dentry->d_sb,
 					   FILESYSTEM__REMOUNT, NULL);
 	else
 		return path_has_perm(cred, path, FILE__MOUNTON);
@@ -2688,7 +2688,7 @@ static int selinux_inode_init_security(struct inode *inode, struct inode *dir,
 	return 0;
 }
 
-static int selinux_inode_create(struct inode *dir, struct dentry *dentry, int mask)
+static int selinux_inode_create(struct inode *dir, struct dentry *dentry, umode_t mode)
 {
 	return may_create(dir, dentry, SECCLASS_FILE);
 }
@@ -2708,7 +2708,7 @@ static int selinux_inode_symlink(struct inode *dir, struct dentry *dentry, const
 	return may_create(dir, dentry, SECCLASS_LNK_FILE);
 }
 
-static int selinux_inode_mkdir(struct inode *dir, struct dentry *dentry, int mask)
+static int selinux_inode_mkdir(struct inode *dir, struct dentry *dentry, umode_t mask)
 {
 	return may_create(dir, dentry, SECCLASS_DIR);
 }
@@ -2718,7 +2718,7 @@ static int selinux_inode_rmdir(struct inode *dir, struct dentry *dentry)
 	return may_link(dir, dentry, MAY_RMDIR);
 }
 
-static int selinux_inode_mknod(struct inode *dir, struct dentry *dentry, int mode, dev_t dev)
+static int selinux_inode_mknod(struct inode *dir, struct dentry *dentry, umode_t mode, dev_t dev)
 {
 	return may_create(dir, dentry, inode_mode_to_security_class(mode));
 }

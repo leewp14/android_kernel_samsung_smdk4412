@@ -564,120 +564,6 @@ static const struct inode_operations proc_def_inode_operations = {
 	.setattr	= proc_setattr,
 };
 
-static int mounts_open_common(struct inode *inode, struct file *file,
-			      const struct seq_operations *op)
-{
-	struct task_struct *task = get_proc_task(inode);
-	struct nsproxy *nsp;
-	struct mnt_namespace *ns = NULL;
-	struct path root;
-	struct proc_mounts *p;
-	int ret = -EINVAL;
-
-	if (task) {
-		rcu_read_lock();
-		nsp = task_nsproxy(task);
-		if (nsp) {
-			ns = nsp->mnt_ns;
-			if (ns)
-				get_mnt_ns(ns);
-		}
-		rcu_read_unlock();
-		if (ns && get_task_root(task, &root) == 0)
-			ret = 0;
-		put_task_struct(task);
-	}
-
-	if (!ns)
-		goto err;
-	if (ret)
-		goto err_put_ns;
-
-	ret = -ENOMEM;
-	p = kmalloc(sizeof(struct proc_mounts), GFP_KERNEL);
-	if (!p)
-		goto err_put_path;
-
-	file->private_data = &p->m;
-	ret = seq_open(file, op);
-	if (ret)
-		goto err_free;
-
-	p->m.private = p;
-	p->ns = ns;
-	p->root = root;
-	p->event = ns->event;
-
-	return 0;
-
- err_free:
-	kfree(p);
- err_put_path:
-	path_put(&root);
- err_put_ns:
-	put_mnt_ns(ns);
- err:
-	return ret;
-}
-
-static int mounts_release(struct inode *inode, struct file *file)
-{
-	struct proc_mounts *p = file->private_data;
-	path_put(&p->root);
-	put_mnt_ns(p->ns);
-	return seq_release(inode, file);
-}
-
-static unsigned mounts_poll(struct file *file, poll_table *wait)
-{
-	struct proc_mounts *p = file->private_data;
-	unsigned res = POLLIN | POLLRDNORM;
-
-	poll_wait(file, &p->ns->poll, wait);
-	if (mnt_had_events(p))
-		res |= POLLERR | POLLPRI;
-
-	return res;
-}
-
-static int mounts_open(struct inode *inode, struct file *file)
-{
-	return mounts_open_common(inode, file, &mounts_op);
-}
-
-static const struct file_operations proc_mounts_operations = {
-	.open		= mounts_open,
-	.read		= seq_read,
-	.llseek		= seq_lseek,
-	.release	= mounts_release,
-	.poll		= mounts_poll,
-};
-
-static int mountinfo_open(struct inode *inode, struct file *file)
-{
-	return mounts_open_common(inode, file, &mountinfo_op);
-}
-
-static const struct file_operations proc_mountinfo_operations = {
-	.open		= mountinfo_open,
-	.read		= seq_read,
-	.llseek		= seq_lseek,
-	.release	= mounts_release,
-	.poll		= mounts_poll,
-};
-
-static int mountstats_open(struct inode *inode, struct file *file)
-{
-	return mounts_open_common(inode, file, &mountstats_op);
-}
-
-static const struct file_operations proc_mountstats_operations = {
-	.open		= mountstats_open,
-	.read		= seq_read,
-	.llseek		= seq_lseek,
-	.release	= mounts_release,
-};
-
 #define PROC_BLOCK_SIZE	(3*1024)		/* 4K page size but our output routines use some slack for overruns */
 
 static ssize_t proc_info_read(struct file * file, char __user * buf,
@@ -1072,7 +958,7 @@ static int oom_adjust_permission(struct inode *inode, int mask,
 	}
 
 	/* Fall back to default. */
-	return generic_permission(inode, mask, flags, NULL);
+	return generic_permission(inode, mask);
 }
 
 static const struct inode_operations proc_oom_adjust_inode_operations = {
@@ -2135,12 +2021,11 @@ static const struct file_operations proc_fd_operations = {
  * /proc/pid/fd needs a special permission handler so that a process can still
  * access /proc/self/fd after it has executed a setuid().
  */
-static int proc_fd_permission(struct inode *inode, int mask, unsigned int flags)
+static int proc_fd_permission(struct inode *inode, int mask)
 {
 	struct task_struct *p;
-	int rv;
 
-	rv = generic_permission(inode, mask, flags, NULL);
+	int rv = generic_permission(inode, mask);
 	if (rv == 0)
 		return rv;
 
@@ -2230,7 +2115,7 @@ static struct dentry *proc_pident_instantiate(struct inode *dir,
 	ei = PROC_I(inode);
 	inode->i_mode = p->mode;
 	if (S_ISDIR(inode->i_mode))
-		inode->i_nlink = 2;	/* Use getattr to fix if necessary */
+		set_nlink(inode, 2);	/* Use getattr to fix if necessary */
 	if (p->iop)
 		inode->i_op = p->iop;
 	if (p->fop)
@@ -2624,7 +2509,7 @@ static struct dentry *proc_base_instantiate(struct inode *dir,
 
 	inode->i_mode = p->mode;
 	if (S_ISDIR(inode->i_mode))
-		inode->i_nlink = 2;
+		set_nlink(inode, 2);
 	if (S_ISLNK(inode->i_mode))
 		inode->i_size = 64;
 	if (p->iop)
@@ -2966,8 +2851,8 @@ static struct dentry *proc_pid_instantiate(struct inode *dir,
 	inode->i_fop = &proc_tgid_base_operations;
 	inode->i_flags|=S_IMMUTABLE;
 
-	inode->i_nlink = 2 + pid_entry_count_dirs(tgid_base_stuff,
-		ARRAY_SIZE(tgid_base_stuff));
+	set_nlink(inode, 2 + pid_entry_count_dirs(tgid_base_stuff,
+						  ARRAY_SIZE(tgid_base_stuff)));
 
 	d_set_d_op(dentry, &pid_dentry_operations);
 
@@ -3221,8 +3106,8 @@ static struct dentry *proc_task_instantiate(struct inode *dir,
 	inode->i_fop = &proc_tid_base_operations;
 	inode->i_flags|=S_IMMUTABLE;
 
-	inode->i_nlink = 2 + pid_entry_count_dirs(tid_base_stuff,
-		ARRAY_SIZE(tid_base_stuff));
+	set_nlink(inode, 2 + pid_entry_count_dirs(tid_base_stuff,
+						  ARRAY_SIZE(tid_base_stuff)));
 
 	d_set_d_op(dentry, &pid_dentry_operations);
 
