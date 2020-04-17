@@ -48,10 +48,6 @@
 
 #define VSYNC_TIMEOUT_MSEC 50
 
-#if defined(CONFIG_MACH_PX) || defined(CONFIG_MACH_Q1_BD)
-#define FEATURE_BUSFREQ_LOCK /* Now, this feature only avaliable in 4210 */
-#endif
-
 /* S3C_FB_MAX_WIN
  * Set to the maximum number of windows that any of the supported hardware
  * can use. Since the platform data uses this for an array size, having it
