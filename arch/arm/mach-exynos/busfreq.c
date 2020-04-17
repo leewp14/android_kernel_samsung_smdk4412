@@ -632,13 +632,6 @@ int exynos4_busfreq_lock(unsigned int nId,
 		ret = -EINVAL;
 		goto err;
 	}
-
-	if (nId == DVFS_LOCK_ID_LCD){
-		pr_err("Preventing LCD lock busfreq\n");
-		ret = -EINVAL;
-		goto err;
-	}
-
 	g_busfreq_lock_id |= (1 << nId);
 	g_busfreq_lock_val[nId] = busfreq_level;
 
@@ -670,17 +663,14 @@ void exynos4_busfreq_lock_free(unsigned int nId)
 	}
 
 	mutex_lock(&set_bus_freq_lock);
+	g_busfreq_lock_id &= ~(1 << nId);
+	g_busfreq_lock_val[nId] = BUS_LEVEL_END - 1;
+	g_busfreq_lock_level = BUS_LEVEL_END - 1;
 
-	if(nId != DVFS_LOCK_ID_LCD){
-		g_busfreq_lock_id &= ~(1 << nId);
-		g_busfreq_lock_val[nId] = BUS_LEVEL_END - 1;
-		g_busfreq_lock_level = BUS_LEVEL_END - 1;
-
-		if (g_busfreq_lock_id) {
-			for (i = 0; i < DVFS_LOCK_ID_END; i++) {
-				if (g_busfreq_lock_val[i] < g_busfreq_lock_level)
-					g_busfreq_lock_level = g_busfreq_lock_val[i];
-			}
+	if (g_busfreq_lock_id) {
+		for (i = 0; i < DVFS_LOCK_ID_END; i++) {
+			if (g_busfreq_lock_val[i] < g_busfreq_lock_level)
+				g_busfreq_lock_level = g_busfreq_lock_val[i];
 		}
 	}
 	mutex_unlock(&set_bus_freq_lock);
